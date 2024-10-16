@@ -15,11 +15,12 @@ public class LibraryInspector
     {
         LibraryName = System.IO.Path.GetFileName(filePath);
         string extension = System.IO.Path.GetExtension(filePath).ToLower();
+        string interopDllPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, System.IO.Path.GetFileNameWithoutExtension(filePath) + $".Interop{extension}.dll");
+
         switch (extension)
         {
             case ".ocx":
             case ".tlb":
-                string interopDllPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, System.IO.Path.GetFileNameWithoutExtension(filePath) + $".Interop{extension}.dll");
                 GenerateInteropAndInspect(filePath, interopDllPath);
                 break;
             case ".dll":
@@ -44,22 +45,31 @@ public class LibraryInspector
             "mscomctl.ocx",
             "mscomct2.ocx"
         };
-        // Skip generation for stdole2.tlb as it is already provided by the system
+
         if (exceptionLibraries.Contains(System.IO.Path.GetFileName(inputFilePath).ToLower()))
         {
             Debug.WriteLine("Skipping generation for known exception library as it is already provided by the system or is known to cause issues.");
             return;
         }
+
         try
         {
             // Generate the .NET interop assembly using tlbimp
-            Process tlbimpProcess = new Process();
-            tlbimpProcess.StartInfo.FileName = "tlbimp";
-            tlbimpProcess.StartInfo.Arguments = $"\"{inputFilePath}\" /out:\"{outputDllPath}\"";
-            tlbimpProcess.StartInfo.RedirectStandardOutput = true;
-            tlbimpProcess.StartInfo.UseShellExecute = false;
-            tlbimpProcess.StartInfo.CreateNoWindow = true;
+            Process tlbimpProcess = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "tlbimp",
+                    Arguments = $"\"{inputFilePath}\" /out:\"{outputDllPath}\"",
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+
             tlbimpProcess.Start();
+            string output = tlbimpProcess.StandardOutput.ReadToEnd();
+            Debug.WriteLine($"tlbimp output: {output}");
             tlbimpProcess.WaitForExit();
 
             if (tlbimpProcess.ExitCode != 0)
@@ -101,15 +111,35 @@ public class LibraryInspector
             {
                 Debug.WriteLine("Not a .NET assembly. Attempting to load as a COM object...\n");
 
+                bool is64BitProcess = Environment.Is64BitProcess;
+                if (is64BitProcess && Is32BitLibrary(dllFilePath))
+                {
+                    Debug.WriteLine("Bitness mismatch: The process is 64-bit, but the library is 32-bit.");
+                    return;
+                }
+                else if (!is64BitProcess && Is64BitLibrary(dllFilePath))
+                {
+                    Debug.WriteLine("Bitness mismatch: The process is 32-bit, but the library is 64-bit.");
+                    return;
+                }
+
                 // If not a .NET assembly, try to generate an interop assembly using tlbimp
                 string interopDllPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, System.IO.Path.GetFileNameWithoutExtension(dllFilePath) + ".Interop.dll");
-                Process tlbimpProcess = new Process();
-                tlbimpProcess.StartInfo.FileName = "tlbimp";
-                tlbimpProcess.StartInfo.Arguments = $"\"{dllFilePath}\" /out:\"{interopDllPath}\"";
-                tlbimpProcess.StartInfo.RedirectStandardOutput = true;
-                tlbimpProcess.StartInfo.UseShellExecute = false;
-                tlbimpProcess.StartInfo.CreateNoWindow = true;
+                Process tlbimpProcess = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "tlbimp",
+                        Arguments = $"\"{dllFilePath}\" /out:\"{interopDllPath}\"",
+                        RedirectStandardOutput = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+
                 tlbimpProcess.Start();
+                string output = tlbimpProcess.StandardOutput.ReadToEnd();
+                Debug.WriteLine($"tlbimp output: {output}");
                 tlbimpProcess.WaitForExit();
 
                 if (tlbimpProcess.ExitCode != 0)
@@ -127,6 +157,48 @@ public class LibraryInspector
         catch (Exception ex)
         {
             Debug.WriteLine($"General error: {ex.Message}");
+        }
+    }
+
+    private bool Is32BitLibrary(string filePath)
+    {
+        try
+        {
+            using (var stream = new System.IO.FileStream(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read))
+            {
+                byte[] data = new byte[4];
+                stream.Seek(0x3C, System.IO.SeekOrigin.Begin);
+                stream.Read(data, 0, 4);
+                int peHeaderOffset = BitConverter.ToInt32(data, 0);
+                stream.Seek(peHeaderOffset + 0x4, System.IO.SeekOrigin.Begin);
+                stream.Read(data, 0, 2);
+                return BitConverter.ToUInt16(data, 0) == 0x10B;
+            }
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private bool Is64BitLibrary(string filePath)
+    {
+        try
+        {
+            using (var stream = new System.IO.FileStream(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read))
+            {
+                byte[] data = new byte[4];
+                stream.Seek(0x3C, System.IO.SeekOrigin.Begin);
+                stream.Read(data, 0, 4);
+                int peHeaderOffset = BitConverter.ToInt32(data, 0);
+                stream.Seek(peHeaderOffset + 0x4, System.IO.SeekOrigin.Begin);
+                stream.Read(data, 0, 2);
+                return BitConverter.ToUInt16(data, 0) == 0x20B;
+            }
+        }
+        catch
+        {
+            return false;
         }
     }
 
