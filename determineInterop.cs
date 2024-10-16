@@ -45,7 +45,7 @@ public class LibraryInspector
             "mscomct2.ocx"
         };
         // Skip generation for stdole2.tlb as it is already provided by the system
-        if (exceptionLibraries.Contains(System.IO.Path.GetFileName(inputFilePath).ToLower())
+        if (exceptionLibraries.Contains(System.IO.Path.GetFileName(inputFilePath).ToLower()))
         {
             Debug.WriteLine("Skipping generation for known exception library as it is already provided by the system or is known to cause issues.");
             return;
