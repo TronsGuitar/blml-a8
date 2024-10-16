@@ -9,7 +9,7 @@ public class ReferencedLibrary
     public List<string> Types { get; private set; } = new List<string>();
     public List<string> Properties { get; private set; } = new List<string>();
     public List<string> Methods { get; private set; } = new List<string>();
-    public string LibraryName { get; private set; }
+    public string LibraryName { get; set; }
 
     public void LoadExistingData(string txtFilePath)
     {
