@@ -11,6 +11,59 @@ public class LibraryInspector
     public List<string> Methods { get; private set; } = new List<string>();
     public string LibraryName { get; private set; }
 
+    private void LoadExistingData(string txtFilePath)
+    {
+        try
+        {
+            string[] lines = System.IO.File.ReadAllLines(txtFilePath);
+            foreach (var line in lines)
+            {
+                if (line.StartsWith("Type: "))
+                {
+                    Types.Add(line.Substring(6));
+                }
+                else if (line.StartsWith("Property: "))
+                {
+                    Properties.Add(line.Substring(10));
+                }
+                else if (line.StartsWith("Method: "))
+                {
+                    Methods.Add(line.Substring(8));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Error while loading existing data: {ex.Message}");
+        }
+    }
+
+    private void SaveAssemblyData(string txtFilePath)
+    {
+        try
+        {
+            using (var writer = new System.IO.StreamWriter(txtFilePath))
+            {
+                foreach (var type in Types)
+                {
+                    writer.WriteLine($"Type: {type}");
+                }
+                foreach (var property in Properties)
+                {
+                    writer.WriteLine($"Property: {property}");
+                }
+                foreach (var method in Methods)
+                {
+                    writer.WriteLine($"Method: {method}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Error while saving assembly data: {ex.Message}");
+        }
+    }
+
     public void InspectLibrary(string filePath)
     {
         LibraryName = System.IO.Path.GetFileName(filePath);
@@ -34,6 +87,23 @@ public class LibraryInspector
 
     private void GenerateInteropAndInspect(string inputFilePath, string outputDllPath)
     {
+        string txtFilePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, System.IO.Path.GetFileNameWithoutExtension(inputFilePath) + ".txt");
+        
+        // Check if the information file already exists
+        if (System.IO.File.Exists(txtFilePath))
+        {
+            Debug.WriteLine("Information file already exists. Loading existing data.");
+            LoadExistingData(txtFilePath);
+            return;
+        }
+        // Check if library has already been inspected
+        if (System.IO.File.Exists(outputDllPath))
+        {
+            Debug.WriteLine("Interop assembly already exists. Loading existing assembly.");
+            Assembly existingAssembly = Assembly.LoadFile(outputDllPath);
+            InspectAndSaveAssembly(existingAssembly, txtFilePath);
+            return;
+        }
         // List of known libraries to skip
         List<string> exceptionLibraries = new List<string>
         {
@@ -202,7 +272,7 @@ public class LibraryInspector
         }
     }
 
-    private void InspectAssembly(Assembly assembly)
+    private void InspectAndSaveAssembly(Assembly assembly, string txtFilePath)
     {
         try
         {
@@ -242,6 +312,7 @@ public class LibraryInspector
         catch (Exception ex)
         {
             Debug.WriteLine($"General error while inspecting assembly: {ex.Message}");
+            SaveAssemblyData(txtFilePath);
         }
     }
 }
