@@ -4,14 +4,14 @@ using System.Runtime.InteropServices;
 using System.Collections.Generic;
 using System.Diagnostics;
 
-public class LibraryInspector
+public class ReferencedLibrary
 {
     public List<string> Types { get; private set; } = new List<string>();
     public List<string> Properties { get; private set; } = new List<string>();
     public List<string> Methods { get; private set; } = new List<string>();
     public string LibraryName { get; private set; }
 
-    private void LoadExistingData(string txtFilePath)
+    public void LoadExistingData(string txtFilePath)
     {
         try
         {
@@ -38,7 +38,7 @@ public class LibraryInspector
         }
     }
 
-    private void SaveAssemblyData(string txtFilePath)
+    public void SaveAssemblyData(string txtFilePath)
     {
         try
         {
@@ -63,10 +63,15 @@ public class LibraryInspector
             Debug.WriteLine($"Error while saving assembly data: {ex.Message}");
         }
     }
+}
+
+public class LibraryInspector
+{
+    private ReferencedLibrary referencedLibrary = new ReferencedLibrary();
 
     public void InspectLibrary(string filePath)
     {
-        LibraryName = System.IO.Path.GetFileName(filePath);
+        referencedLibrary.LibraryName = System.IO.Path.GetFileName(filePath);
         string extension = System.IO.Path.GetExtension(filePath).ToLower();
         string interopDllPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, System.IO.Path.GetFileNameWithoutExtension(filePath) + $".Interop{extension}.dll");
 
@@ -93,7 +98,7 @@ public class LibraryInspector
         if (System.IO.File.Exists(txtFilePath))
         {
             Debug.WriteLine("Information file already exists. Loading existing data.");
-            LoadExistingData(txtFilePath);
+            referencedLibrary.LoadExistingData(txtFilePath);
             return;
         }
         // Check if library has already been inspected
@@ -113,7 +118,16 @@ public class LibraryInspector
             "msdatsrc.tlb",
             "msadodc.ocx",
             "mscomctl.ocx",
-            "mscomct2.ocx"
+            "mscomct2.ocx",
+            "comdlg32.ocx",   // Common Dialog Control
+            "richtx32.ocx",   // Rich Textbox Control
+            "msinet.ocx",     // Microsoft Internet Transfer Control
+            "tabctl32.ocx",   // Microsoft Tabbed Dialog Control
+            "comctl32.ocx",   // Common Controls ActiveX Control
+            "sysinfo.ocx",    // System Information Control
+            "mci32.ocx",      // MCI Control
+            "msmask32.ocx",   // Masked Edit Control
+            "picclp32.ocx"    // Picture Clip Control
         };
 
         if (exceptionLibraries.Contains(System.IO.Path.GetFileName(inputFilePath).ToLower()))
@@ -153,7 +167,7 @@ public class LibraryInspector
             // Load the COM Type Library
             Assembly assembly = Assembly.LoadFile(outputDllPath);
 
-            InspectAssembly(assembly);
+            InspectAndSaveAssembly(assembly, txtFilePath);
         }
         catch (COMException comEx)
         {
@@ -222,7 +236,7 @@ public class LibraryInspector
                 assembly = Assembly.LoadFile(interopDllPath);
             }
 
-            InspectAssembly(assembly);
+            InspectAndSaveAssembly(assembly, System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, System.IO.Path.GetFileNameWithoutExtension(dllFilePath) + ".txt"));
         }
         catch (Exception ex)
         {
@@ -272,51 +286,4 @@ public class LibraryInspector
         }
     }
 
-    private void InspectAndSaveAssembly(Assembly assembly, string txtFilePath)
-    {
-        try
-        {
-            // Get all types in the assembly
-            Type[] types = assembly.GetTypes();
-
-            foreach (Type type in types)
-            {
-                Types.Add(type.Name);
-                Debug.WriteLine($"Inspecting type: {type.Name}\n");
-
-                // Get the properties of the type
-                foreach (PropertyInfo prop in type.GetProperties())
-                {
-                    Properties.Add(prop.Name);
-                    Debug.WriteLine($"Property: {prop.Name}");
-                }
-
-                // Get the methods of the type
-                foreach (MethodInfo method in type.GetMethods())
-                {
-                    Methods.Add(method.Name);
-                    Debug.WriteLine($"Method: {method.Name}");
-                }
-            }
-
-            // Display the results
-            Debug.WriteLine("\nList of Types:");
-            Types.ForEach(type => Debug.WriteLine(type));
-
-            Debug.WriteLine("\nList of Properties:");
-            Properties.ForEach(property => Debug.WriteLine(property));
-
-            Debug.WriteLine("\nList of Methods:");
-            Methods.ForEach(method => Debug.WriteLine(method));
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"General error while inspecting assembly: {ex.Message}");
-            SaveAssemblyData(txtFilePath);
-        }
-    }
 }
-
-// Note:
-// You need to have tlbimp.exe available in your system PATH or specify the full path to tlbimp.
-// Replace "C:\path\to\your\control.ocx", "C:\path\to\your\library.tlb", and "C:\path\to\your\library.dll" with the actual paths to your files.
