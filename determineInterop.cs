@@ -19,7 +19,7 @@ public class LibraryInspector
         {
             case ".ocx":
             case ".tlb":
-                string interopDllPath = filePath.Replace(extension, $".Interop{extension}.dll");
+                string interopDllPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, System.IO.Path.GetFileNameWithoutExtension(filePath) + $".Interop{extension}.dll");
                 GenerateInteropAndInspect(filePath, interopDllPath);
                 break;
             case ".dll":
@@ -33,6 +33,24 @@ public class LibraryInspector
 
     private void GenerateInteropAndInspect(string inputFilePath, string outputDllPath)
     {
+        // List of known libraries to skip
+        List<string> exceptionLibraries = new List<string>
+        {
+            "stdole2.tlb",
+            "sccrun.tlb",
+            "msbind.dll",
+            "msdatsrc.tlb",
+            "msadodc.ocx",
+            "mscomctl.ocx",
+            "mscomct2.ocx"
+        };
+        // Skip generation for stdole2.tlb as it is already provided by the system
+        if (exceptionLibraries.Contains(System.IO.Path.GetFileName(inputFilePath).ToLower())
+        {
+            Debug.WriteLine("Skipping generation for known exception library as it is already provided by the system or is known to cause issues.
+");
+            return;
+        }
         try
         {
             // Generate the .NET interop assembly using tlbimp
@@ -85,7 +103,7 @@ public class LibraryInspector
                 Debug.WriteLine("Not a .NET assembly. Attempting to load as a COM object...\n");
 
                 // If not a .NET assembly, try to generate an interop assembly using tlbimp
-                string interopDllPath = dllFilePath.Replace(".dll", ".Interop.dll");
+                string interopDllPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, System.IO.Path.GetFileNameWithoutExtension(dllFilePath) + ".Interop.dll");
                 Process tlbimpProcess = new Process();
                 tlbimpProcess.StartInfo.FileName = "tlbimp";
                 tlbimpProcess.StartInfo.Arguments = $"\"{dllFilePath}\" /out:\"{interopDllPath}\"";
@@ -142,13 +160,13 @@ public class LibraryInspector
 
             // Display the results
             Debug.WriteLine("\nList of Types:");
-            Types.ForEach(Debug.WriteLine);
+            Types.ForEach(type => Debug.WriteLine(type));
 
             Debug.WriteLine("\nList of Properties:");
-            Properties.ForEach(Debug.WriteLine);
+            Properties.ForEach(property => Debug.WriteLine(property));
 
             Debug.WriteLine("\nList of Methods:");
-            Methods.ForEach(Debug.WriteLine);
+            Methods.ForEach(method => Debug.WriteLine(method));
         }
         catch (Exception ex)
         {
