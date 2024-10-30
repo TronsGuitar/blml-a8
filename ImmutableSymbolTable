@@ -1,0 +1,451 @@
+using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Text;
+
+// Ensure you have the System.Collections.Immutable package installed
+
+// Token Types Enumeration
+public enum TokenType
+{
+    Identifier,
+    PredefinedConstant,
+    StringLiteral,
+    Operator,
+    EndOfFile,
+    // Add other necessary token types
+}
+
+// Token Class
+public class Token
+{
+    public TokenType Type { get; }
+    public string Value { get; }
+    public int Position { get; }
+
+    public Token(TokenType type, string value, int position)
+    {
+        Type = type;
+        Value = value;
+        Position = position;
+    }
+
+    public override string ToString()
+    {
+        return $"{Type}: {Value} (Pos: {Position})";
+    }
+}
+
+// SymbolTable with ImmutableDictionary
+public static class SymbolTable
+{
+    public static readonly ImmutableDictionary<string, object> PredefinedConstants;
+
+    static SymbolTable()
+    {
+        PredefinedConstants = ImmutableDictionary.Create<string, object>()
+            .AddRange(new[]
+            {
+                #region Data Type Constants
+                new KeyValuePair<string, object>("vbNull", 1),
+                new KeyValuePair<string, object>("vbEmpty", 0),
+                new KeyValuePair<string, object>("vbInteger", 2),
+                new KeyValuePair<string, object>("vbLong", 3),
+                new KeyValuePair<string, object>("vbSingle", 4),
+                new KeyValuePair<string, object>("vbDouble", 5),
+                new KeyValuePair<string, object>("vbCurrency", 6),
+                new KeyValuePair<string, object>("vbDate", 7),
+                new KeyValuePair<string, object>("vbString", 8),
+                new KeyValuePair<string, object>("vbObject", 9),
+                new KeyValuePair<string, object>("vbError", 10),
+                new KeyValuePair<string, object>("vbBoolean", 11),
+                new KeyValuePair<string, object>("vbVariant", 12),
+                new KeyValuePair<string, object>("vbDataObject", 13),
+                new KeyValuePair<string, object>("vbDecimal", 14),
+                new KeyValuePair<string, object>("vbByte", 17),
+                new KeyValuePair<string, object>("vbArray", 8192),
+                #endregion
+
+                #region Date and Time Constants
+                new KeyValuePair<string, object>("vbSunday", 1),
+                new KeyValuePair<string, object>("vbMonday", 2),
+                new KeyValuePair<string, object>("vbTuesday", 3),
+                new KeyValuePair<string, object>("vbWednesday", 4),
+                new KeyValuePair<string, object>("vbThursday", 5),
+                new KeyValuePair<string, object>("vbFriday", 6),
+                new KeyValuePair<string, object>("vbSaturday", 7),
+                new KeyValuePair<string, object>("vbUseSystemDayOfWeek", 0),
+                new KeyValuePair<string, object>("vbFirstJan1", 1),
+                new KeyValuePair<string, object>("vbFirstFourDays", 2),
+                new KeyValuePair<string, object>("vbFirstFullWeek", 3),
+                #endregion
+
+                #region String Constants
+                new KeyValuePair<string, object>("vbNullChar", '\0'),
+                new KeyValuePair<string, object>("vbCr", '\r'),
+                new KeyValuePair<string, object>("vbLf", '\n'),
+                new KeyValuePair<string, object>("vbCrLf", "\r\n"),
+                new KeyValuePair<string, object>("vbTab", '\t'),
+                new KeyValuePair<string, object>("vbBack", '\b'),
+                new KeyValuePair<string, object>("vbFormFeed", '\f'),
+                new KeyValuePair<string, object>("vbVerticalTab", '\v'),
+                new KeyValuePair<string, object>("vbNullString", null), // Representing a null pointer
+                #endregion
+
+                #region Color Constants
+                new KeyValuePair<string, object>("vbBlack", 0x000000),
+                new KeyValuePair<string, object>("vbRed", 0xFF),
+                new KeyValuePair<string, object>("vbGreen", 0xFF00),
+                new KeyValuePair<string, object>("vbYellow", 0xFFFF),
+                new KeyValuePair<string, object>("vbBlue", 0xFF0000),
+                new KeyValuePair<string, object>("vbMagenta", 0xFF00FF),
+                new KeyValuePair<string, object>("vbCyan", 0xFFFF00),
+                new KeyValuePair<string, object>("vbWhite", 0xFFFFFF),
+                #endregion
+
+                #region Miscellaneous Constants
+                new KeyValuePair<string, object>("vbObjectError", unchecked((int)0x80040000)),
+                new KeyValuePair<string, object>("vbTrue", true),
+                new KeyValuePair<string, object>("vbFalse", false),
+                #endregion
+
+                #region Tristate Constants
+                new KeyValuePair<string, object>("vbUseDefault", -2),
+                new KeyValuePair<string, object>("vbTriStateTrue", -1),
+                new KeyValuePair<string, object>("vbTriStateFalse", 0),
+                #endregion
+
+                #region Comparison Constants
+                new KeyValuePair<string, object>("vbBinaryCompare", 0),
+                new KeyValuePair<string, object>("vbTextCompare", 1),
+                new KeyValuePair<string, object>("vbDatabaseCompare", 2),
+                #endregion
+
+                #region File I/O Constants
+                new KeyValuePair<string, object>("vbNormal", 0),
+                new KeyValuePair<string, object>("vbReadOnly", 1),
+                new KeyValuePair<string, object>("vbHidden", 2),
+                new KeyValuePair<string, object>("vbSystem", 4),
+                new KeyValuePair<string, object>("vbArchive", 32),
+                new KeyValuePair<string, object>("vbAlias", 64),
+                #endregion
+
+                #region Mode Constants
+                new KeyValuePair<string, object>("vbFormControlMenu", 0),
+                new KeyValuePair<string, object>("vbModal", 1),
+                new KeyValuePair<string, object>("vbModeless", 0),
+                #endregion
+            });
+    }
+}
+
+// Lexer Class
+public class Lexer
+{
+    private readonly string _input;
+    private int _position;
+    private readonly ImmutableHashSet<string> _predefinedConstants;
+
+    public Lexer(string input)
+    {
+        _input = input;
+        _position = 0;
+        _predefinedConstants = SymbolTable.PredefinedConstants.Keys.ToImmutableHashSet();
+    }
+
+    public List<Token> Tokenize()
+    {
+        var tokens = new List<Token>();
+
+        while (_position < _input.Length)
+        {
+            char current = _input[_position];
+
+            if (char.IsWhiteSpace(current))
+            {
+                _position++;
+                continue;
+            }
+
+            if (char.IsLetter(current) || current == '_')
+            {
+                string identifier = ReadIdentifier();
+                if (_predefinedConstants.Contains(identifier))
+                {
+                    tokens.Add(new Token(TokenType.PredefinedConstant, identifier, _position));
+                }
+                else
+                {
+                    tokens.Add(new Token(TokenType.Identifier, identifier, _position));
+                }
+                continue;
+            }
+
+            if (current == '"' || current == '\'') // Handle string literals
+            {
+                string str = ReadStringLiteral();
+                tokens.Add(new Token(TokenType.StringLiteral, str, _position));
+                continue;
+            }
+
+            // Handle operators and other single characters
+            switch (current)
+            {
+                case '&':
+                case '+':
+                case '-':
+                case '*':
+                case '/':
+                case '=':
+                case '<':
+                case '>':
+                case '(': 
+                case ')':
+                    tokens.Add(new Token(TokenType.Operator, current.ToString(), _position));
+                    _position++;
+                    break;
+                default:
+                    throw new Exception($"Unrecognized character '{current}' at position {_position}");
+            }
+        }
+
+        tokens.Add(new Token(TokenType.EndOfFile, string.Empty, _position));
+        return tokens;
+    }
+
+    private string ReadIdentifier()
+    {
+        int start = _position;
+        while (_position < _input.Length && (char.IsLetterOrDigit(_input[_position]) || _input[_position] == '_'))
+        {
+            _position++;
+        }
+        return _input.Substring(start, _position - start);
+    }
+
+    private string ReadStringLiteral()
+    {
+        char quote = _input[_position];
+        _position++; // Skip the opening quote
+        int start = _position;
+        while (_position < _input.Length && _input[_position] != quote)
+        {
+            _position++;
+        }
+        if (_position >= _input.Length)
+            throw new Exception("Unterminated string literal");
+
+        string str = _input.Substring(start, _position - start);
+        _position++; // Skip the closing quote
+        return str;
+    }
+}
+
+// Abstract Expression Class
+public abstract class Expression
+{
+}
+
+// String Literal Expression
+public class StringLiteralExpression : Expression
+{
+    public string Value { get; }
+
+    public StringLiteralExpression(string value)
+    {
+        Value = value;
+    }
+}
+
+// Predefined Constant Expression
+public class PredefinedConstantExpression : Expression
+{
+    public string ConstantName { get; }
+    public object Value { get; }
+
+    public PredefinedConstantExpression(string name, object value)
+    {
+        ConstantName = name;
+        Value = value;
+    }
+}
+
+// Binary Expression (e.g., concatenation)
+public class BinaryExpression : Expression
+{
+    public Expression Left { get; }
+    public string Operator { get; }
+    public Expression Right { get; }
+
+    public BinaryExpression(Expression left, string op, Expression right)
+    {
+        Left = left;
+        Operator = op;
+        Right = right;
+    }
+}
+
+// Parser Class
+public class Parser
+{
+    private readonly List<Token> _tokens;
+    private int _current;
+
+    public Parser(List<Token> tokens)
+    {
+        _tokens = tokens;
+        _current = 0;
+    }
+
+    public Expression Parse()
+    {
+        return ParseExpression();
+    }
+
+    private Expression ParseExpression()
+    {
+        // For simplicity, handle only concatenation using &
+        Expression left = ParsePrimary();
+
+        while (Match(TokenType.Operator) && CurrentToken().Value == "&")
+        {
+            string op = Consume(TokenType.Operator).Value;
+            Expression right = ParsePrimary();
+            left = new BinaryExpression(left, op, right);
+        }
+
+        return left;
+    }
+
+    private Expression ParsePrimary()
+    {
+        Token token = CurrentToken();
+
+        if (token.Type == TokenType.StringLiteral)
+        {
+            Consume(TokenType.StringLiteral);
+            return new StringLiteralExpression(token.Value);
+        }
+        else if (token.Type == TokenType.PredefinedConstant)
+        {
+            return ParsePredefinedConstant();
+        }
+        else if (token.Type == TokenType.Identifier)
+        {
+            // Handle variables or user-defined constants if needed
+            throw new NotImplementedException("User-defined identifiers not implemented.");
+        }
+
+        throw new Exception($"Unexpected token {token.Type} at position {token.Position}");
+    }
+
+    /// <summary>
+    /// Parses a predefined constant like vbCrLf.
+    /// </summary>
+    /// <returns>A PredefinedConstantExpression representing the constant.</returns>
+    private PredefinedConstantExpression ParsePredefinedConstant()
+    {
+        Token token = Consume(TokenType.PredefinedConstant);
+        if (SymbolTable.PredefinedConstants.TryGetValue(token.Value, out object value))
+        {
+            return new PredefinedConstantExpression(token.Value, value);
+        }
+        else
+        {
+            throw new Exception($"Unknown predefined constant '{token.Value}' at position {token.Position}");
+        }
+    }
+
+    private bool Match(TokenType type)
+    {
+        if (IsAtEnd()) return false;
+        return CurrentToken().Type == type;
+    }
+
+    private Token Consume(TokenType type)
+    {
+        if (Match(type))
+            return _tokens[_current++];
+        throw new Exception($"Expected token {type} at position {_current}");
+    }
+
+    private Token CurrentToken()
+    {
+        return _tokens[_current];
+    }
+
+    private bool IsAtEnd()
+    {
+        return _current >= _tokens.Count || _tokens[_current].Type == TokenType.EndOfFile;
+    }
+}
+
+// Program Class with Evaluation Logic
+public class Program
+{
+    public static void Main()
+    {
+        string vb6Code = "\"Hello,\" & vbCrLf & \"World!\"";
+
+        // Step 1: Lexical Analysis
+        Lexer lexer = new Lexer(vb6Code);
+        List<Token> tokens = lexer.Tokenize();
+
+        Console.WriteLine("Tokens:");
+        foreach (var token in tokens)
+        {
+            Console.WriteLine(token);
+        }
+
+        // Step 2: Parsing
+        Parser parser = new Parser(tokens);
+        Expression expression = parser.Parse();
+
+        // Step 3: Evaluating the Expression
+        object result = EvaluateExpression(expression);
+        Console.WriteLine("\nParsed Expression Result:");
+        Console.WriteLine(result);
+    }
+
+    private static object EvaluateExpression(Expression expr)
+    {
+        if (expr is StringLiteralExpression stringExpr)
+        {
+            return stringExpr.Value;
+        }
+        else if (expr is PredefinedConstantExpression constExpr)
+        {
+            // Retrieve the actual value from the SymbolTable
+            if (SymbolTable.PredefinedConstants.TryGetValue(constExpr.ConstantName, out object value))
+            {
+                return value;
+            }
+            else
+            {
+                throw new Exception($"Undefined constant '{constExpr.ConstantName}'");
+            }
+        }
+        else if (expr is BinaryExpression binaryExpr)
+        {
+            object left = EvaluateExpression(binaryExpr.Left);
+            object right = EvaluateExpression(binaryExpr.Right);
+            switch (binaryExpr.Operator)
+            {
+                case "&":
+                    return Convert.ToString(left) + Convert.ToString(right);
+                case "+":
+                    // Handle addition based on operand types
+                    if (left is int lInt && right is int rInt)
+                    {
+                        return lInt + rInt;
+                    }
+                    // Add more type-specific handling as needed
+                    return Convert.ToDouble(left) + Convert.ToDouble(right);
+                // Handle other operators as needed
+                default:
+                    throw new Exception($"Unsupported operator {binaryExpr.Operator}");
+            }
+        }
+        throw new Exception("Unsupported expression type");
+    }
+}
