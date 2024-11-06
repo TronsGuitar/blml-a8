@@ -1,0 +1,102 @@
+// Dataset for Learning C# Concepts - Vector Database Format
+
+// Dataset Format for Vector Database
+// Each concept is represented as a JSON-like structure for easy ingestion into a vector database.
+
+// 1. Basic Syntax and Concepts
+// ============================
+[
+  {
+    "concept": "Variables",
+    "category": "Basic Syntax",
+    "description": "A variable is a named location in memory to store data.",
+    "code_snippet": "int number = 10;\nstring message = \"Hello, World!\";\ndouble pi = 3.14;\nbool isLearning = true;",
+    "tags": ["C#", "Basic Syntax", "Variable"]
+  },
+  {
+    "concept": "Conditional Statements",
+    "category": "Basic Syntax",
+    "description": "Conditional statements allow branching logic based on certain conditions.",
+    "code_snippet": "if (number > 5) { Console.WriteLine(\"Number is greater than 5\"); } else { Console.WriteLine(\"Number is 5 or less\"); }",
+    "tags": ["C#", "Basic Syntax", "Conditionals"]
+  },
+  {
+    "concept": "Loops",
+    "category": "Basic Syntax",
+    "description": "Loops are used to execute a block of code repeatedly.",
+    "code_snippet": "for (int i = 0; i < number; i++) { Console.WriteLine($\"Loop iteration: {i}\"); }\nint count = 0;\nwhile (count < 5) { Console.WriteLine($\"Count is: {count}\"); count++; }",
+    "tags": ["C#", "Basic Syntax", "Loop"]
+  },
+
+// 2. Object-Oriented Programming (OOP)
+// ====================================
+  {
+    "concept": "Classes and Objects",
+    "category": "OOP",
+    "description": "Classes are blueprints for creating objects. Objects are instances of classes.",
+    "code_snippet": "public class Animal { public string Name { get; set; } public Animal(string name) { Name = name; } }",
+    "tags": ["C#", "OOP", "Classes"]
+  },
+  {
+    "concept": "Inheritance",
+    "category": "OOP",
+    "description": "Inheritance allows one class to inherit fields and methods from another class.",
+    "code_snippet": "public class Dog : Animal { public Dog(string name) : base(name) { } }",
+    "tags": ["C#", "OOP", "Inheritance"]
+  },
+  {
+    "concept": "Polymorphism",
+    "category": "OOP",
+    "description": "Polymorphism allows derived classes to provide specific implementations of methods defined in base classes.",
+    "code_snippet": "public override void Speak() { Console.WriteLine($\"{Name} barks.\"); }",
+    "tags": ["C#", "OOP", "Polymorphism"]
+  },
+
+// 3. Advanced Features
+// ====================
+  {
+    "concept": "LINQ",
+    "category": "Advanced Features",
+    "description": "LINQ (Language Integrated Query) is used for querying collections in a readable manner.",
+    "code_snippet": "List<int> numbers = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };\nvar evenNumbers = numbers.Where(n => n % 2 == 0).ToList();\nevenNumbers.ForEach(n => Console.WriteLine(n));",
+    "tags": ["C#", "Advanced", "LINQ"]
+  },
+  {
+    "concept": "Async/Await",
+    "category": "Advanced Features",
+    "description": "Async and await keywords provide a way to run asynchronous code for non-blocking execution.",
+    "code_snippet": "static async Task DoWorkAsync() { await Task.Delay(2000); Console.WriteLine(\"Async work completed!\"); }",
+    "tags": ["C#", "Advanced", "Async"]
+  },
+  {
+    "concept": "Delegates",
+    "category": "Advanced Features",
+    "description": "Delegates are used to pass methods as arguments to other methods.",
+    "code_snippet": "public delegate void Notify();\nNotify notifyDelegate = ShowNotification;\nnotifyDelegate();",
+    "tags": ["C#", "Advanced", "Delegates"]
+  },
+
+// 4. Common Libraries
+// ===================
+  {
+    "concept": "Collections",
+    "category": "Common Libraries",
+    "description": "Collections such as dictionaries are used to store data with key-value pairs.",
+    "code_snippet": "Dictionary<string, int> ageDictionary = new Dictionary<string, int> { { \"Alice\", 30 }, { \"Bob\", 25 }, { \"Charlie\", 35 } };\nforeach (var entry in ageDictionary) { Console.WriteLine($\"{entry.Key} is {entry.Value} years old.\"); }",
+    "tags": ["C#", "Libraries", "Collections"]
+  },
+  {
+    "concept": "File I/O",
+    "category": "Common Libraries",
+    "description": "File I/O operations allow reading from and writing to files.",
+    "code_snippet": "string filePath = \"example.txt\";\nFile.WriteAllText(filePath, \"Hello, this is a sample text file.\");\nstring fileContent = File.ReadAllText(filePath);\nConsole.WriteLine($\"File Content: {fileContent}\");",
+    "tags": ["C#", "Libraries", "File I/O"]
+  },
+  {
+    "concept": "Networking",
+    "category": "Common Libraries",
+    "description": "HttpClient is used for sending HTTP requests and receiving HTTP responses from a resource identified by a URI.",
+    "code_snippet": "using (HttpClient client = new HttpClient()) { string url = \"https://jsonplaceholder.typicode.com/todos/1\"; string result = await client.GetStringAsync(url); Console.WriteLine($\"Response from {url}: {result}\"); }",
+    "tags": ["C#", "Libraries", "Networking"]
+  }
+]
