@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+    <key>name</key>
+    <string>VB6</string>
+    <key>scopeName</key>
+    <string>source.vb6</string>
+    <key>fileTypes</key>
+    <array>
+        <string>vb</string>
+        <string>frm</string>
+        <string>bas</string>
+        <string>cls</string>
+    </array>
+    <key>patterns</key>
+    <array>
+        <!-- Comments -->
+        <dict>
+            <key>name</key>
+            <string>comment.line.apostrophe.vb6</string>
+            <key>match</key>
+            <string>'[^\n]*</string>
+        </dict>
+
+        <!-- Strings -->
+        <dict>
+            <key>name</key>
+            <string>string.quoted.double.vb6</string>
+            <key>begin</key>
+            <string>"</string>
+            <key>end</key>
+            <string>"</string>
+        </dict>
+
+        <!-- Keywords -->
+        <dict>
+            <key>name</key>
+            <string>keyword.control.vb6</string>
+            <key>match</key>
+            <string>\b(If|Then|Else|ElseIf|End|While|Wend|For|Next|To|Step|Do|Loop|Until|Call|Sub|Function|Exit|Select|Case|GoTo|On|Resume|With|End If|End Sub|End Function|End Select|End With)\b</string>
+        </dict>
+
+        <!-- Data Types -->
+        <dict>
+            <key>name</key>
+            <string>storage.type.vb6</string>
+            <key>match</key>
+            <string>\b(Integer|Long|Single|Double|Currency|String|Boolean|Byte|Variant|Object|Date)\b</string>
+        </dict>
+
+        <!-- Functions and Subroutines -->
+        <dict>
+            <key>name</key>
+            <string>entity.name.function.vb6</string>
+            <key>match</key>
+            <string>\b(Function|Sub)\s+([a-zA-Z_][a-zA-Z0-9_]*)\b</string>
+            <key>captures</key>
+            <dict>
+                <key>1</key>
+                <dict>
+                    <key>name</key>
+                    <string>keyword.declaration.function.vb6</string>
+                </dict>
+                <key>2</key>
+                <dict>
+                    <key>name</key>
+                    <string>entity.name.function.vb6</string>
+                </dict>
+            </dict>
+        </dict>
+
+        <!-- Constants -->
+        <dict>
+            <key>name</key>
+            <string>constant.language.vb6</string>
+            <key>match</key>
+            <string>\b(True|False|Nothing)\b</string>
+        </dict>
+
+        <!-- Numbers -->
+        <dict>
+            <key>name</key>
+            <string>constant.numeric.vb6</string>
+            <key>match</key>
+            <string>\b(\d+\.?\d*|\d*\.\d+)\b</string>
+        </dict>
+
+        <!-- Variables -->
+        <dict>
+            <key>name</key>
+            <string>variable.other.vb6</string>
+            <key>match</key>
+            <string>\b[a-zA-Z_][a-zA-Z0-9_]*\b</string>
+        </dict>
+    </array>
+    <key>repository</key>
+    <dict>
+        <!-- Repository definitions, if needed, can be added here -->
+    </dict>
+    <key>uuid</key>
+    <string>d5fae3e6-b829-4f8b-89d1-ccd6e9f2c26e</string>
+</dict>
+</plist>
