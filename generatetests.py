@@ -41,30 +41,31 @@ METHOD_TEST_TEMPLATE = """
         }}
 """
 
-def extract_class_and_methods(file_path):
+def extract_class_namespace_and_methods(file_path):
     """
-    Extracts the class name and public method names from a C# file.
+    Extracts the namespace, class name, and public method names from a C# file.
     """
     with open(file_path, 'r', encoding='utf-8') as file:
         content = file.read()
 
-    # Regex to extract class name
+    # Extract namespace
+    namespace_match = re.search(r'namespace\s+([\w\.]+)', content)
+    namespace = namespace_match.group(1) if namespace_match else "UnknownNamespace"
+
+    # Extract class name
     class_match = re.search(r'class\s+(\w+)', content)
-    if not class_match:
-        return None, []
+    class_name = class_match.group(1) if class_match else None
 
-    class_name = class_match.group(1)
-
-    # Regex to extract public method names
+    # Extract public methods
     method_matches = re.findall(r'public\s+[\w<>\[\]]+\s+(\w+)\s*\(', content)
     
-    return class_name, method_matches
+    return namespace, class_name, method_matches
 
 def generate_test_file(input_file, output_file):
     """
-    Generates a test file based on the class and methods extracted.
+    Generates a test file based on the class, namespace, and methods extracted.
     """
-    class_name, method_names = extract_class_and_methods(input_file)
+    namespace, class_name, method_names = extract_class_namespace_and_methods(input_file)
     if not class_name:
         print(f"Skipping {input_file}: No class found.")
         return
@@ -73,10 +74,6 @@ def generate_test_file(input_file, output_file):
     methods_tests = ""
     for method_name in method_names:
         methods_tests += METHOD_TEST_TEMPLATE.format(method_name=method_name)
-
-    # Create namespace based on file directory structure
-    namespace = os.path.dirname(input_file).replace(os.sep, '.').replace(" ", "_")
-    namespace = f"GeneratedTests{namespace}"
 
     # Fill the test template
     test_content = TEST_TEMPLATE.format(
@@ -104,13 +101,18 @@ def recreate_folder_structure_and_generate_tests(input_folder, output_folder):
             if file.endswith('.cs'):  # Only process C# files
                 input_file = os.path.join(root, file)
 
-                # Recreate folder structure in the output folder
-                relative_path = os.path.relpath(root, input_folder)
-                test_folder = os.path.join(output_folder, relative_path)
+                # Extract namespace to determine test file path
+                namespace, class_name, _ = extract_class_namespace_and_methods(input_file)
+                if not class_name:
+                    continue  # Skip files without a class
+
+                # Create a folder structure based on the namespace
+                namespace_path = namespace.replace('.', os.sep)
+                test_folder = os.path.join(output_folder, namespace_path)
                 os.makedirs(test_folder, exist_ok=True)
 
                 # Generate test file
-                test_file_name = file.replace('.cs', 'Tests.cs')
+                test_file_name = f"{class_name}Tests.cs"
                 output_file = os.path.join(test_folder, test_file_name)
                 generate_test_file(input_file, output_file)
 
