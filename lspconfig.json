@@ -1,0 +1,32 @@
+{
+  "version": "1.0",
+  "content": [
+    {
+      "filePattern": "*.vbp",
+      "languages": [ "vb6" ],
+      "command": "path\\to\\your\\language-server.exe",
+      "arguments": [],
+      "additionalConfigurations": {
+        "traceOutput": "verbose"
+      }
+    },
+    {
+      "filePattern": "*.bas",
+      "languages": [ "vb6" ],
+      "command": "path\\to\\your\\language-server.exe",
+      "arguments": [],
+      "additionalConfigurations": {
+        "traceOutput": "verbose"
+      }
+    },
+    {
+      "filePattern": "*.frm",
+      "languages": [ "vb6" ],
+      "command": "path\\to\\your\\language-server.exe",
+      "arguments": [],
+      "additionalConfigurations": {
+        "traceOutput": "verbose"
+      }
+    }
+  ]
+}
