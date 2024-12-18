@@ -20,9 +20,11 @@ class VB6ToCSharpPreparer
             return;
         }
 
-        string outputFilePath = Path.Combine(folderPath, "CombinedVB6CodeForCSharp.cs");
-        var vb6Files = Directory.GetFiles(folderPath, "*.bas");
-        vb6Files = vb6Files.Concat(Directory.GetFiles(folderPath, "*.cls")).Concat(Directory.GetFiles(folderPath, "*.frm")).ToArray();
+        string outputFilePath = Path.Combine(folderPath, @"CombinedVB6CodeForCSharp.cs");
+        var vb6Files = Directory.GetFiles(folderPath, "*.bas")
+            .Concat(Directory.GetFiles(folderPath, "*.cls"))
+            .Concat(Directory.GetFiles(folderPath, "*.frm"))
+            .ToArray();
 
         List<string> processedLines = new List<string>();
 
