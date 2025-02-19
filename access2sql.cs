@@ -7,13 +7,36 @@ using System.Collections.Generic;
 
 class AccessToSqlServer
 {
-    static string accessFilePath = "C:\\path\\to\\your\\database.accdb";
-    static string outputSqlFile = "C:\\path\\to\\output.sql";
-    static string outputAspNetFolder = "C:\\path\\to\\AspNetForms";
-
     static void Main()
     {
-        Console.WriteLine("Starting Extraction...");
+        Console.WriteLine("=== Access to SQL Server Converter ===");
+
+        // Get Access file path from user
+        Console.Write("Enter the full path of the Access (.accdb) database: ");
+        string accessFilePath = Console.ReadLine().Trim();
+
+        while (!File.Exists(accessFilePath))
+        {
+            Console.Write("File not found! Please enter a valid Access (.accdb) file path: ");
+            accessFilePath = Console.ReadLine().Trim();
+        }
+
+        // Get output folder path for SQL and ASP.NET files
+        Console.Write("Enter the output directory for SQL scripts and ASP.NET files: ");
+        string outputFolder = Console.ReadLine().Trim();
+
+        while (!Directory.Exists(outputFolder))
+        {
+            Console.Write("Directory not found! Please enter a valid output directory path: ");
+            outputFolder = Console.ReadLine().Trim();
+        }
+
+        string outputSqlFile = Path.Combine(outputFolder, "output.sql");
+        string outputAspNetFolder = Path.Combine(outputFolder, "AspNetForms");
+
+        Directory.CreateDirectory(outputAspNetFolder); // Ensure directory exists
+
+        Console.WriteLine("\nProcessing...\n");
 
         try
         {
@@ -22,7 +45,7 @@ class AccessToSqlServer
             using (OleDbConnection conn = new OleDbConnection(connString))
             {
                 conn.Open();
-                Console.WriteLine("Connected to Access Database");
+                Console.WriteLine("Connected to Access Database.");
 
                 // Extract Tables and Generate SQL
                 string tableSql = ExtractTables(conn);
@@ -31,21 +54,21 @@ class AccessToSqlServer
                 string querySql = ExtractQueries(conn);
 
                 // Extract Forms (Generate ASP.NET Files)
-                ExtractForms(conn);
+                ExtractForms(conn, outputAspNetFolder);
 
                 // Save SQL Output
                 File.WriteAllText(outputSqlFile, tableSql + "\n\n" + querySql);
-
-                Console.WriteLine($"SQL Script Generated: {outputSqlFile}");
-                Console.WriteLine("ASP.NET Forms generated in: " + outputAspNetFolder);
+                Console.WriteLine($"✅ SQL Script Generated: {outputSqlFile}");
+                Console.WriteLine($"✅ ASP.NET Forms saved in: {outputAspNetFolder}");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine("Error: " + ex.Message);
+            Console.WriteLine("❌ Error: " + ex.Message);
         }
 
-        Console.WriteLine("Extraction Complete.");
+        Console.WriteLine("\nExtraction Complete. Press any key to exit.");
+        Console.ReadKey();
     }
 
     static string ExtractTables(OleDbConnection conn)
@@ -119,7 +142,7 @@ class AccessToSqlServer
         return sqlBuilder.ToString();
     }
 
-    static void ExtractForms(OleDbConnection conn)
+    static void ExtractForms(OleDbConnection conn, string outputAspNetFolder)
     {
         DataTable forms = conn.GetSchema("Tables");
 
