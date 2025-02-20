@@ -117,30 +117,62 @@ class AccessToSqlServer
         return typeMapping.ContainsKey(accessType) ? typeMapping[accessType] : "NVARCHAR(MAX)";
     }
 
-    static string ExtractQueries(OleDbConnection conn)
+static string ExtractQueries(OleDbConnection conn)
+{
+    StringBuilder sqlBuilder = new StringBuilder();
+
+    // Use MSysObjects to get query names (Type = 5 means saved queries)
+    string query = "SELECT Name FROM MSysObjects WHERE Type = 5 AND Name NOT LIKE 'MSys%'";
+
+    using (OleDbCommand cmd = new OleDbCommand(query, conn))
+    using (OleDbDataReader reader = cmd.ExecuteReader())
     {
-        StringBuilder sqlBuilder = new StringBuilder();
-        string query = "SELECT Name, SQL FROM MSysQueries";
-
-        using (OleDbCommand cmd = new OleDbCommand(query, conn))
-        using (OleDbDataReader reader = cmd.ExecuteReader())
+        while (reader.Read())
         {
-            while (reader.Read())
+            string queryName = reader["Name"].ToString();
+            Console.WriteLine($"Extracting Query: {queryName}");
+
+            // Retrieve SQL for the query (Try using Direct Query Execution)
+            string sqlQueryText = GetQueryDefinition(conn, queryName);
+            
+            if (!string.IsNullOrEmpty(sqlQueryText))
             {
-                string queryName = reader["Name"].ToString();
-                string querySql = reader["SQL"].ToString();
-                Console.WriteLine($"Extracting Query: {queryName}");
-
-                // Convert Access SQL to SQL Server compatible syntax
-                querySql = querySql.Replace("[", "").Replace("]", "").Replace(";", "");
-
                 sqlBuilder.Append($"-- Query: {queryName}\n");
-                sqlBuilder.Append(querySql + ";\n\n");
+                sqlBuilder.Append(sqlQueryText + ";\n\n");
             }
         }
-
-        return sqlBuilder.ToString();
     }
+
+    return sqlBuilder.ToString();
+}
+
+    static string GetQueryDefinition(OleDbConnection conn, string queryName)
+{
+    string querySql = "";
+
+    try
+    {
+        // Open connection using DAO (Database Access Objects)
+        Type accessType = Type.GetTypeFromProgID("DAO.DBEngine.120");
+        dynamic dbEngine = Activator.CreateInstance(accessType);
+        dynamic db = dbEngine.OpenDatabase(conn.DataSource);
+        dynamic queryDef = db.QueryDefs[queryName];
+
+        querySql = queryDef.SQL; // Get SQL definition of the query
+
+        // Cleanup
+        queryDef.Close();
+        db.Close();
+        dbEngine = null;
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error retrieving SQL for query {queryName}: {ex.Message}");
+    }
+
+    return querySql;
+}
+
 
     static void ExtractForms(OleDbConnection conn, string outputAspNetFolder)
     {
