@@ -324,22 +324,38 @@ static Dictionary<string, string> GetVBAFunctions(OleDbConnection conn, string f
 {
     Dictionary<string, string> vbaReferences = new Dictionary<string, string>();
 
-    string query = $"SELECT Name, EventProc FROM MSysObjects WHERE ParentId = (SELECT Id FROM MSysObjects WHERE Name = '{formName}')";
+    string query = @"
+        SELECT o.Name AS ControlName, m.Name AS VBAFunction 
+        FROM MSysObjects o 
+        INNER JOIN MSysModules m ON o.Id = m.Id 
+        WHERE o.Type = -32768 AND o.Name = ?";
 
     using (OleDbCommand cmd = new OleDbCommand(query, conn))
-    using (OleDbDataReader reader = cmd.ExecuteReader())
     {
-        while (reader.Read())
-        {
-            string controlName = reader["Name"].ToString();
-            string vbaFunction = reader["EventProc"] != DBNull.Value ? reader["EventProc"].ToString() : "None";
+        cmd.Parameters.AddWithValue("?", formName);
 
-            vbaReferences[controlName] = vbaFunction;
+        try
+        {
+            using (OleDbDataReader reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    string controlName = reader["ControlName"].ToString();
+                    string vbaFunction = reader["VBAFunction"] != DBNull.Value ? reader["VBAFunction"].ToString() : "None";
+
+                    vbaReferences[controlName] = vbaFunction;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error retrieving VBA functions: {ex.Message}");
         }
     }
 
     return vbaReferences;
 }
+
 
 
 static string GenerateAspNetForm(string formName, List<string> fields, Dictionary<string, string> vbaFunctions)
