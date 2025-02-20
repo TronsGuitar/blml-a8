@@ -173,45 +173,54 @@ static void GrantReadPermission(OleDbConnection conn)
 static string ExtractQueries(OleDbConnection conn)
 {
     StringBuilder sqlBuilder = new StringBuilder();
-
-    // Use MSysObjects to get query names (Type = 5 means saved queries)
     string query = "SELECT Name FROM MSysObjects WHERE Type = 5 AND Name NOT LIKE 'MSys%'";
 
-    using (OleDbCommand cmd = new OleDbCommand(query, conn))
-    using (OleDbDataReader reader = cmd.ExecuteReader())
+    try
     {
-        while (reader.Read())
+        using (OleDbCommand cmd = new OleDbCommand(query, conn))
+        using (OleDbDataReader reader = cmd.ExecuteReader())
         {
-            string queryName = reader["Name"].ToString();
-            Console.WriteLine($"Extracting Query: {queryName}");
-
-            // Retrieve SQL for the query (Try using Direct Query Execution)
-            string sqlQueryText = GetQueryDefinition(conn, queryName);
-            
-            if (!string.IsNullOrEmpty(sqlQueryText))
+            while (reader.Read())
             {
-                sqlBuilder.Append($"-- Query: {queryName}\n");
-                sqlBuilder.Append(sqlQueryText + ";\n\n");
+                string queryName = reader["Name"].ToString();
+                Console.WriteLine($"Extracting Query: {queryName}");
+
+                // Get SQL Definition of the Query
+                string querySql = GetQueryDefinition(conn, queryName);
+                
+                if (!string.IsNullOrEmpty(querySql))
+                {
+                    // Convert Access SQL to SQL Server Compatible SQL
+                    string convertedSql = ConvertAccessQueryToSqlServer(queryName, querySql);
+
+                    sqlBuilder.Append($"-- Query: {queryName}\n");
+                    sqlBuilder.Append(convertedSql + ";\n\n");
+                }
             }
         }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error extracting queries: {ex.Message}");
     }
 
     return sqlBuilder.ToString();
 }
 
-    static string GetQueryDefinition(OleDbConnection conn, string queryName)
+
+ static string GetQueryDefinition(OleDbConnection conn, string queryName)
 {
     string querySql = "";
 
     try
     {
-        // Open connection using DAO (Database Access Objects)
+        // Open DAO connection
         Type accessType = Type.GetTypeFromProgID("DAO.DBEngine.120");
         dynamic dbEngine = Activator.CreateInstance(accessType);
         dynamic db = dbEngine.OpenDatabase(conn.DataSource);
         dynamic queryDef = db.QueryDefs[queryName];
 
-        querySql = queryDef.SQL; // Get SQL definition of the query
+        querySql = queryDef.SQL; // Get SQL definition
 
         // Cleanup
         queryDef.Close();
@@ -225,11 +234,25 @@ static string ExtractQueries(OleDbConnection conn)
 
     return querySql;
 }
+static string ConvertAccessQueryToSqlServer(string queryName, string accessSql)
+{
+    // Remove Access-specific brackets and replace with SQL Server compatible format
+    string convertedSql = accessSql.Replace("[", "").Replace("]", "").Replace(";", "");
+
+    // Check if it's a SELECT query (create a view) or an action query (create a stored procedure)
+    if (convertedSql.Trim().StartsWith("SELECT", StringComparison.OrdinalIgnoreCase))
+    {
+        return $"CREATE VIEW {queryName} AS \n{convertedSql}";
+    }
+    else
+    {
+        return $"CREATE PROCEDURE {queryName} AS \nBEGIN\n{convertedSql}\nEND";
+    }
+}
 
 
 static void ExtractForms(OleDbConnection conn, string outputAspNetFolder)
 {
-    StringBuilder formNames = new StringBuilder();
     string query = "SELECT Name FROM MSysObjects WHERE Type = -32768 AND Name NOT LIKE 'MSys%'";
 
     try
@@ -242,16 +265,16 @@ static void ExtractForms(OleDbConnection conn, string outputAspNetFolder)
                 string formName = reader["Name"].ToString();
                 Console.WriteLine($"Extracting Form: {formName}");
 
-                // Generate ASP.NET Razor Form
-                string cshtmlContent = GenerateAspNetForm(formName);
+                // Get Form Fields and VBA References
+                List<string> formFields = GetFormFields(conn, formName);
+                Dictionary<string, string> vbaFunctions = GetVBAFunctions(conn, formName);
+
+                // Generate ASP.NET Razor Page with Fields
+                string cshtmlContent = GenerateAspNetForm(formName, formFields, vbaFunctions);
                 string csFile = Path.Combine(outputAspNetFolder, formName + ".cshtml");
                 File.WriteAllText(csFile, cshtmlContent);
-
-                formNames.AppendLine(formName);
             }
         }
-
-        Console.WriteLine($"✅ Forms Extracted:\n{formNames.ToString()}");
     }
     catch (Exception ex)
     {
@@ -259,23 +282,66 @@ static void ExtractForms(OleDbConnection conn, string outputAspNetFolder)
     }
 }
 
+static List<string> GetFormFields(OleDbConnection conn, string formName)
+{
+    List<string> fields = new List<string>();
+    
+    string query = $"SELECT Name FROM MSysObjects WHERE ParentId = (SELECT Id FROM MSysObjects WHERE Name = '{formName}')";
 
-    static string GenerateAspNetForm(string formName)
+    using (OleDbCommand cmd = new OleDbCommand(query, conn))
+    using (OleDbDataReader reader = cmd.ExecuteReader())
     {
-        return @$"
-@page
-@model {formName}Model
-
-<h2>{formName}</h2>
-
-<form method='post'>
-    <div class='form-group'>
-        <label for='field1'>Field 1:</label>
-        <input type='text' class='form-control' id='field1' name='field1'>
-    </div>
-
-    <button type='submit' class='btn btn-primary'>Submit</button>
-</form>
-";
+        while (reader.Read())
+        {
+            fields.Add(reader["Name"].ToString());
+        }
     }
+
+    return fields;
 }
+static Dictionary<string, string> GetVBAFunctions(OleDbConnection conn, string formName)
+{
+    Dictionary<string, string> vbaReferences = new Dictionary<string, string>();
+
+    string query = $"SELECT Name, EventProc FROM MSysObjects WHERE ParentId = (SELECT Id FROM MSysObjects WHERE Name = '{formName}')";
+
+    using (OleDbCommand cmd = new OleDbCommand(query, conn))
+    using (OleDbDataReader reader = cmd.ExecuteReader())
+    {
+        while (reader.Read())
+        {
+            string controlName = reader["Name"].ToString();
+            string vbaFunction = reader["EventProc"] != DBNull.Value ? reader["EventProc"].ToString() : "None";
+
+            vbaReferences[controlName] = vbaFunction;
+        }
+    }
+
+    return vbaReferences;
+}
+
+
+static string GenerateAspNetForm(string formName, List<string> fields, Dictionary<string, string> vbaFunctions)
+{
+    StringBuilder formHtml = new StringBuilder();
+
+    formHtml.AppendLine($"@page\n@model {formName}Model\n\n<h2>{formName}</h2>\n");
+    formHtml.AppendLine("<form method='post'>");
+
+    foreach (string field in fields)
+    {
+        string vbaFunction = vbaFunctions.ContainsKey(field) ? vbaFunctions[field] : "None";
+
+        formHtml.AppendLine($@"
+        <div class='form-group'>
+            <label for='{field}'>{field}</label>
+            <input type='text' class='form-control' id='{field}' name='{field}' onblur='CallVBA(\"{vbaFunction}\")'>
+        </div>");
+    }
+
+    formHtml.AppendLine("<button type='submit' class='btn btn-primary'>Submit</button>");
+    formHtml.AppendLine("</form>");
+
+    return formHtml.ToString();
+}
+
