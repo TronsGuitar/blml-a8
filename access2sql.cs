@@ -71,7 +71,41 @@ GrantReadPermission(conn);
         Console.WriteLine("\nExtraction Complete. Press any key to exit.");
         Console.ReadKey();
     }
-
+static void EnableReadAccessToMSysObjects(OleDbConnection conn)
+{
+    try
+    {
+        string sql = "UPDATE MSysObjects SET Flags = 0 WHERE Name = 'MSysObjects'";
+        using (OleDbCommand cmd = new OleDbCommand(sql, conn))
+        {
+            cmd.ExecuteNonQuery();
+        }
+        Console.WriteLine("✅ Flags updated: Read access to MSysObjects enabled.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error updating MSysObjects flags: {ex.Message}");
+    }
+}
+    //Set accessApp = CreateObject("Access.Application")
+//accessApp.OpenCurrentDatabase "C:\path\to\your\database.accdb"
+//accessApp.DoCmd.RunSQL "GRANT SELECT ON MSysObjects TO Admin;"
+//accessApp.Quit
+    //or open acccd and cnt g and run
+    //CurrentProject.Connection.Execute "GRANT SELECT ON MSysObjects TO Admin;"
+    static void RunVbaScript()
+{
+    try
+    {
+        string scriptPath = "C:\\path\\to\\EnablePermissions.vbs";
+        System.Diagnostics.Process.Start("wscript.exe", scriptPath);
+        Console.WriteLine("✅ VBA script executed to grant permissions.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error executing VBA script: {ex.Message}");
+    }
+}
     static string ExtractTables(OleDbConnection conn)
     {
         StringBuilder sqlBuilder = new StringBuilder();
