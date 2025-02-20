@@ -106,36 +106,53 @@ static void EnableReadAccessToMSysObjects(OleDbConnection conn)
         Console.WriteLine($"❌ Error executing VBA script: {ex.Message}");
     }
 }
-    static string ExtractTables(OleDbConnection conn)
+static string ExtractTables(OleDbConnection conn)
+{
+    StringBuilder sqlBuilder = new StringBuilder();
+    DataTable tables = conn.GetSchema("Tables");
+
+    foreach (DataRow row in tables.Rows)
     {
-        StringBuilder sqlBuilder = new StringBuilder();
-        DataTable tables = conn.GetSchema("Tables");
+        string tableName = row["TABLE_NAME"].ToString();
 
-        foreach (DataRow row in tables.Rows)
+        // Skip system tables and forms (Type = -32768)
+        if (!tableName.StartsWith("MSys") && !IsForm(conn, tableName))
         {
-            string tableName = row["TABLE_NAME"].ToString();
-            if (!tableName.StartsWith("MSys")) // Ignore system tables
+            Console.WriteLine($"Extracting Table: {tableName}");
+            sqlBuilder.Append($"CREATE TABLE [{tableName}] (\n");
+
+            DataTable columns = conn.GetSchema("Columns", new string[] { null, null, tableName, null });
+
+            foreach (DataRow col in columns.Rows)
             {
-                Console.WriteLine($"Extracting Table: {tableName}");
-                sqlBuilder.Append($"CREATE TABLE [{tableName}] (\n");
+                string colName = col["COLUMN_NAME"].ToString();
+                string dataType = col["DATA_TYPE"].ToString();
+                string sqlType = ConvertAccessTypeToSqlServer(dataType);
 
-                DataTable columns = conn.GetSchema("Columns", new string[] { null, null, tableName, null });
-
-                foreach (DataRow col in columns.Rows)
-                {
-                    string colName = col["COLUMN_NAME"].ToString();
-                    string dataType = col["DATA_TYPE"].ToString();
-                    string sqlType = ConvertAccessTypeToSqlServer(dataType);
-
-                    sqlBuilder.Append($"  [{colName}] {sqlType},\n");
-                }
-
-                sqlBuilder.Append(");\n\n");
+                sqlBuilder.Append($"  [{colName}] {sqlType},\n");
             }
-        }
 
-        return sqlBuilder.ToString();
+            sqlBuilder.Append(");\n\n");
+        }
     }
+
+    return sqlBuilder.ToString();
+}
+static bool IsForm(OleDbConnection conn, string objectName)
+{
+    bool isForm = false;
+    string query = "SELECT COUNT(*) FROM MSysObjects WHERE Type = -32768 AND Name = ?";
+
+    using (OleDbCommand cmd = new OleDbCommand(query, conn))
+    {
+        cmd.Parameters.AddWithValue("?", objectName);
+        int count = Convert.ToInt32(cmd.ExecuteScalar());
+        isForm = count > 0;
+    }
+
+    return isForm;
+}
+
 
     static string ConvertAccessTypeToSqlServer(string accessType)
     {
@@ -286,19 +303,23 @@ static List<string> GetFormFields(OleDbConnection conn, string formName)
 {
     List<string> fields = new List<string>();
     
-    string query = $"SELECT Name FROM MSysObjects WHERE ParentId = (SELECT Id FROM MSysObjects WHERE Name = '{formName}')";
+    string query = $"SELECT Name FROM MSysObjects WHERE ParentId IN (SELECT Id FROM MSysObjects WHERE Name = ?)";
 
     using (OleDbCommand cmd = new OleDbCommand(query, conn))
-    using (OleDbDataReader reader = cmd.ExecuteReader())
     {
-        while (reader.Read())
+        cmd.Parameters.AddWithValue("?", formName);
+        using (OleDbDataReader reader = cmd.ExecuteReader())
         {
-            fields.Add(reader["Name"].ToString());
+            while (reader.Read())
+            {
+                fields.Add(reader["Name"].ToString());
+            }
         }
     }
 
     return fields;
 }
+
 static Dictionary<string, string> GetVBAFunctions(OleDbConnection conn, string formName)
 {
     Dictionary<string, string> vbaReferences = new Dictionary<string, string>();
