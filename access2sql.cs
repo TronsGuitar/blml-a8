@@ -49,7 +49,8 @@ class AccessToSqlServer
 
                 // Extract Tables and Generate SQL
                 string tableSql = ExtractTables(conn);
-
+                
+GrantReadPermission(conn);
                 // Extract Queries
                 string querySql = ExtractQueries(conn);
 
@@ -116,7 +117,25 @@ class AccessToSqlServer
 
         return typeMapping.ContainsKey(accessType) ? typeMapping[accessType] : "NVARCHAR(MAX)";
     }
+    
+static void GrantReadPermission(OleDbConnection conn)
+{
+    try
+    {
+        string sql = "GRANT SELECT ON MSysObjects TO Admin";
+        using (OleDbCommand cmd = new OleDbCommand(sql, conn))
+        {
+            cmd.ExecuteNonQuery();
+        }
+        Console.WriteLine("✅ Read permission granted on MSysObjects.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Unable to grant permission: {ex.Message}");
+    }
+}
 
+    
 static string ExtractQueries(OleDbConnection conn)
 {
     StringBuilder sqlBuilder = new StringBuilder();
