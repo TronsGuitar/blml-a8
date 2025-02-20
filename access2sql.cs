@@ -227,23 +227,38 @@ static string ExtractQueries(OleDbConnection conn)
 }
 
 
-    static void ExtractForms(OleDbConnection conn, string outputAspNetFolder)
-    {
-        DataTable forms = conn.GetSchema("Tables");
+static void ExtractForms(OleDbConnection conn, string outputAspNetFolder)
+{
+    StringBuilder formNames = new StringBuilder();
+    string query = "SELECT Name FROM MSysObjects WHERE Type = -32768 AND Name NOT LIKE 'MSys%'";
 
-        foreach (DataRow row in forms.Rows)
+    try
+    {
+        using (OleDbCommand cmd = new OleDbCommand(query, conn))
+        using (OleDbDataReader reader = cmd.ExecuteReader())
         {
-            string formName = row["TABLE_NAME"].ToString();
-            if (formName.StartsWith("Form_")) // Assume forms are named as "Form_*"
+            while (reader.Read())
             {
+                string formName = reader["Name"].ToString();
                 Console.WriteLine($"Extracting Form: {formName}");
 
+                // Generate ASP.NET Razor Form
                 string cshtmlContent = GenerateAspNetForm(formName);
                 string csFile = Path.Combine(outputAspNetFolder, formName + ".cshtml");
                 File.WriteAllText(csFile, cshtmlContent);
+
+                formNames.AppendLine(formName);
             }
         }
+
+        Console.WriteLine($"✅ Forms Extracted:\n{formNames.ToString()}");
     }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error extracting forms: {ex.Message}");
+    }
+}
+
 
     static string GenerateAspNetForm(string formName)
     {
