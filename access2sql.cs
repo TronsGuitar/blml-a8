@@ -394,7 +394,7 @@ static string GenerateAspNetForm(string formName, List<string> fields, Dictionar
 
     foreach (string field in fields)
     {
-        string vbaFunction = vbaFunctions.ContainsKey(field) ? vbaFunctions[field] : "None";
+        string vbaFunction = vbaFunctions.ContainsKey(formName) ? vbaFunctions[formName] : "None";
 
         formHtml.AppendLine($@"
         <div class='form-group'>
@@ -406,8 +406,32 @@ static string GenerateAspNetForm(string formName, List<string> fields, Dictionar
     formHtml.AppendLine("<button type='submit' class='btn btn-primary'>Submit</button>");
     formHtml.AppendLine("</form>");
 
+    // Embed VBA Code (if available)
+    if (vbaFunctions.ContainsKey(formName))
+    {
+        formHtml.AppendLine("<pre><code>");
+        formHtml.AppendLine(vbaFunctions[formName]);
+        formHtml.AppendLine("</code></pre>");
+    }
+
     return formHtml.ToString();
 }
+
+
+   static Dictionary<string, string> ReadFormVBAFromFiles(string folderPath)
+{
+    Dictionary<string, string> formVBA = new Dictionary<string, string>();
+
+    foreach (string file in Directory.GetFiles(folderPath, "*.txt"))
+    {
+        string formName = Path.GetFileNameWithoutExtension(file).Replace("_VBA", "");
+        string functionBody = File.ReadAllText(file);
+        formVBA[formName] = functionBody;
+    }
+
+    return formVBA;
+}
+
 /*
 If Access does not expose VBA via SQL, use VBA to export it.
 
@@ -437,6 +461,48 @@ Sub ExportVBAFunctions()
     Next obj
 
     MsgBox "VBA Functions Exported Successfully!", vbInformation, "Success"
+End Sub
+Since VBA code is stored inside Forms, you must loop through each Form and export its code.
+
+📌 Steps
+Open Microsoft Access (.accdb file).
+Press Alt + F11 to open the VBA Editor.
+Click Insert → Module.
+Copy and paste this VBA script:
+vba
+Copy
+Edit
+
+Sub ExportFormVBA()
+    Dim obj As Object
+    Dim exportPath As String
+    exportPath = "C:\VBA_Export\Forms\"
+
+    ' Ensure directory exists
+    If Dir(exportPath, vbDirectory) = "" Then MkDir exportPath
+
+    ' Loop through all Forms in Access
+    Dim frm As Access.Form
+    Dim frmName As String
+
+    For Each obj In CurrentProject.AllForms
+        frmName = obj.Name
+        DoCmd.OpenForm frmName, acDesign, , , , acHidden ' Open form in design mode
+
+        ' Export VBA module from the form
+        Dim fileName As String
+        fileName = exportPath & frmName & "_VBA.txt"
+        Open fileName For Output As #1
+        Print #1, Forms(frmName).Module.Lines(1, Forms(frmName).Module.CountOfLines)
+        Close #1
+
+        ' Close the form
+        DoCmd.Close acForm, frmName, acSaveNo
+
+        Debug.Print "Exported VBA module from Form: " & frmName
+    Next obj
+
+    MsgBox "All VBA code exported successfully!", vbInformation, "Success"
 End Sub
 
 */
