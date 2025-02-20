@@ -356,6 +356,33 @@ static Dictionary<string, string> GetVBAFunctions(OleDbConnection conn, string f
     return vbaReferences;
 }
 
+static void ListAllSystemTables(OleDbConnection conn)
+{
+    Console.WriteLine("🔍 Checking for available system tables...");
+    string query = "SELECT Name FROM MSysObjects WHERE Type < 0";
+
+    using (OleDbCommand cmd = new OleDbCommand(query, conn))
+    using (OleDbDataReader reader = cmd.ExecuteReader())
+    {
+        while (reader.Read())
+        {
+            Console.WriteLine($"📂 System Table: {reader["Name"].ToString()}");
+        }
+    }
+}
+static Dictionary<string, string> ReadVBAFunctionsFromFiles(string folderPath)
+{
+    Dictionary<string, string> vbaFunctions = new Dictionary<string, string>();
+
+    foreach (string file in Directory.GetFiles(folderPath, "*.txt"))
+    {
+        string functionName = Path.GetFileNameWithoutExtension(file);
+        string functionBody = File.ReadAllText(file);
+        vbaFunctions[functionName] = functionBody;
+    }
+
+    return vbaFunctions;
+}
 
 
 static string GenerateAspNetForm(string formName, List<string> fields, Dictionary<string, string> vbaFunctions)
@@ -381,4 +408,35 @@ static string GenerateAspNetForm(string formName, List<string> fields, Dictionar
 
     return formHtml.ToString();
 }
+/*
+If Access does not expose VBA via SQL, use VBA to export it.
 
+📌 Steps
+Open Access (.accdb).
+Press Alt + F11 to open the VBA Editor.
+Click Insert → Module.
+
+Sub ExportVBAFunctions()
+    Dim obj As Object
+    Dim exportPath As String
+    exportPath = "C:\VBA_Export\"
+
+    ' Ensure directory exists
+    If Dir(exportPath, vbDirectory) = "" Then MkDir exportPath
+
+    ' Loop through all VBA modules
+    For Each obj In Application.VBE.VBProjects(1).VBComponents
+        If obj.Type = 1 Then ' Standard module
+            Dim fileName As String
+            fileName = exportPath & obj.Name & ".txt"
+            Open fileName For Output As #1
+            Print #1, obj.CodeModule.Lines(1, obj.CodeModule.CountOfLines)
+            Close #1
+            Debug.Print "Exported VBA module: " & obj.Name
+        End If
+    Next obj
+
+    MsgBox "VBA Functions Exported Successfully!", vbInformation, "Success"
+End Sub
+
+*/
