@@ -120,18 +120,37 @@ namespace AccessExtractor
                     
                     try
                     {
-                        // Export form as XML
-                        string xmlFilePath = Path.Combine(outputDir, $"{formName}.xml");
+                        // Save form definition using SaveAsText
+                        string txtFilePath = Path.Combine(outputDir, $"{formName}.txt");
                         
-                        // Use dynamic to access AcExportXMLObjectType enum
-                        dynamic objectType = 2; // 2 = acExportForm
-                        
-                        accessApp.DoCmd.ExportXML(
-                            objectType,
-                            formName,
-                            xmlFilePath);
-                        
-                        Console.WriteLine($"Exported form XML: {xmlFilePath}");
+                        try {
+                            // acForm = 2
+                            accessApp.Application.SaveAsText(2, formName, txtFilePath);
+                            Console.WriteLine($"Exported form definition: {txtFilePath}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"  Warning: Could not export {formName} definition: {ex.Message}");
+                            
+                            // Fall back to OutputTo
+                            try {
+                                // Use dynamic to access AcOutputObjectType and AcFormat enums
+                                dynamic acOutputForm = 2; // 2 = acOutputForm
+                                dynamic acFormatTXT = 0; // 0 = acFormatTXT
+                                
+                                accessApp.DoCmd.OutputTo(
+                                    acOutputForm,
+                                    formName,
+                                    acFormatTXT,
+                                    txtFilePath);
+                                
+                                Console.WriteLine($"Exported form TXT: {txtFilePath}");
+                            }
+                            catch (Exception innerEx)
+                            {
+                                Console.WriteLine($"  Warning: Could not export {formName} as TXT: {innerEx.Message}");
+                            }
+                        }
                         
                         // Also try to export as HTML if possible
                         try
@@ -201,18 +220,37 @@ namespace AccessExtractor
                     
                     try
                     {
-                        // Export report as XML
-                        string xmlFilePath = Path.Combine(outputDir, $"{reportName}.xml");
+                        // Save report definition using SaveAsText
+                        string txtFilePath = Path.Combine(outputDir, $"{reportName}.txt");
                         
-                        // Use dynamic to access AcExportXMLObjectType enum
-                        dynamic objectType = 3; // 3 = acExportReport
-                        
-                        accessApp.DoCmd.ExportXML(
-                            objectType,
-                            reportName,
-                            xmlFilePath);
-                        
-                        Console.WriteLine($"Exported report XML: {xmlFilePath}");
+                        try {
+                            // acReport = 3
+                            accessApp.Application.SaveAsText(3, reportName, txtFilePath);
+                            Console.WriteLine($"Exported report definition: {txtFilePath}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"  Warning: Could not export {reportName} definition: {ex.Message}");
+                            
+                            // Fall back to OutputTo
+                            try {
+                                // Use dynamic to access AcOutputObjectType and AcFormat enums
+                                dynamic acOutputReport = 3; // 3 = acOutputReport
+                                dynamic acFormatTXT = 0; // 0 = acFormatTXT
+                                
+                                accessApp.DoCmd.OutputTo(
+                                    acOutputReport,
+                                    reportName,
+                                    acFormatTXT,
+                                    txtFilePath);
+                                
+                                Console.WriteLine($"Exported report TXT: {txtFilePath}");
+                            }
+                            catch (Exception innerEx)
+                            {
+                                Console.WriteLine($"  Warning: Could not export {reportName} as TXT: {innerEx.Message}");
+                            }
+                        }
                         
                         // Also try to export as PDF
                         try
