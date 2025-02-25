@@ -2,7 +2,8 @@ using System;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using Microsoft.Office.Interop.Access;
+using System.Collections;
+using System.Collections.Generic;
 
 namespace AccessExtractor
 {
@@ -49,13 +50,13 @@ namespace AccessExtractor
             Directory.CreateDirectory(formsDir);
             Directory.CreateDirectory(reportsDir);
 
-            Application accessApp = null;
+            dynamic accessApp = null;
 
             try
             {
                 // Create Access application COM object through late binding
                 Type accessType = Type.GetTypeFromProgID("Access.Application");
-                accessApp = (Application)Activator.CreateInstance(accessType);
+                accessApp = Activator.CreateInstance(accessType);
                 
                 // Open the database
                 accessApp.Visible = false;
@@ -99,112 +100,185 @@ namespace AccessExtractor
             }
         }
 
-        private static void ExtractForms(Application accessApp, string outputDir)
+        private static void ExtractForms(dynamic accessApp, string outputDir)
         {
             Console.WriteLine("Extracting forms...");
             
-            // Get all forms in the database
-            foreach (AccessObject form in accessApp.CurrentProject.AllForms)
+            try
             {
-                string formName = form.Name;
-                Console.WriteLine($"Processing form: {formName}");
+                // Get all forms in the database using dynamic (late binding) to avoid AccessObject type issues
+                dynamic allForms = accessApp.CurrentProject.AllForms;
+                int count = allForms.Count;
                 
-                try
+                Console.WriteLine($"Found {count} forms in the database.");
+                
+                for (int i = 0; i < count; i++)
                 {
-                    // Export form as XML
-                    string xmlFilePath = Path.Combine(outputDir, $"{formName}.xml");
-                    accessApp.DoCmd.ExportXML(
-                        ObjectType: AcExportXMLObjectType.acExportForm,
-                        DataSource: formName,
-                        DataTarget: xmlFilePath);
+                    dynamic form = allForms[i];
+                    string formName = form.Name;
+                    Console.WriteLine($"Processing form: {formName}");
                     
-                    Console.WriteLine($"Exported form XML: {xmlFilePath}");
-                    
-                    // Also try to export as HTML if possible
                     try
                     {
-                        string htmlFilePath = Path.Combine(outputDir, $"{formName}.html");
-                        accessApp.DoCmd.OutputTo(
-                            ObjectType: AcOutputObjectType.acOutputForm,
-                            ObjectName: formName,
-                            OutputFormat: AcFormat.acFormatHTML,
-                            OutputFile: htmlFilePath);
+                        // Export form as XML
+                        string xmlFilePath = Path.Combine(outputDir, $"{formName}.xml");
                         
-                        Console.WriteLine($"Exported form HTML: {htmlFilePath}");
+                        // Use dynamic to access AcExportXMLObjectType enum
+                        dynamic objectType = 2; // 2 = acExportForm
+                        
+                        accessApp.DoCmd.ExportXML(
+                            objectType,
+                            formName,
+                            xmlFilePath);
+                        
+                        Console.WriteLine($"Exported form XML: {xmlFilePath}");
+                        
+                        // Also try to export as HTML if possible
+                        try
+                        {
+                            string htmlFilePath = Path.Combine(outputDir, $"{formName}.html");
+                            
+                            // Use dynamic to access AcOutputObjectType and AcFormat enums
+                            dynamic acOutputForm = 2; // 2 = acOutputForm
+                            dynamic acFormatHTML = 2; // 2 = acFormatHTML
+                            
+                            accessApp.DoCmd.OutputTo(
+                                acOutputForm,
+                                formName,
+                                acFormatHTML,
+                                htmlFilePath);
+                            
+                            Console.WriteLine($"Exported form HTML: {htmlFilePath}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"  Warning: Could not export {formName} as HTML: {ex.Message}");
+                        }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"  Warning: Could not export {formName} as HTML: {ex.Message}");
+                        Console.WriteLine($"  Error exporting form {formName}: {ex.Message}");
+                    }
+                    
+                    // Release COM object
+                    if (form != null)
+                    {
+                        Marshal.ReleaseComObject(form);
                     }
                 }
-                catch (Exception ex)
+                
+                // Release COM object
+                if (allForms != null)
                 {
-                    Console.WriteLine($"  Error exporting form {formName}: {ex.Message}");
+                    Marshal.ReleaseComObject(allForms);
                 }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error processing forms: {ex.Message}");
             }
             
             Console.WriteLine($"Form extraction complete. Forms saved to: {outputDir}");
         }
 
-        private static void ExtractReports(Application accessApp, string outputDir)
+        private static void ExtractReports(dynamic accessApp, string outputDir)
         {
             Console.WriteLine("Extracting reports...");
             
-            // Get all reports in the database
-            foreach (AccessObject report in accessApp.CurrentProject.AllReports)
+            try
             {
-                string reportName = report.Name;
-                Console.WriteLine($"Processing report: {reportName}");
+                // Get all reports in the database using dynamic (late binding) to avoid AccessObject type issues
+                dynamic allReports = accessApp.CurrentProject.AllReports;
+                int count = allReports.Count;
                 
-                try
+                Console.WriteLine($"Found {count} reports in the database.");
+                
+                for (int i = 0; i < count; i++)
                 {
-                    // Export report as XML
-                    string xmlFilePath = Path.Combine(outputDir, $"{reportName}.xml");
-                    accessApp.DoCmd.ExportXML(
-                        ObjectType: AcExportXMLObjectType.acExportReport,
-                        DataSource: reportName,
-                        DataTarget: xmlFilePath);
+                    dynamic report = allReports[i];
+                    string reportName = report.Name;
+                    Console.WriteLine($"Processing report: {reportName}");
                     
-                    Console.WriteLine($"Exported report XML: {xmlFilePath}");
-                    
-                    // Also try to export as PDF and other formats
                     try
                     {
-                        string pdfFilePath = Path.Combine(outputDir, $"{reportName}.pdf");
-                        accessApp.DoCmd.OutputTo(
-                            ObjectType: AcOutputObjectType.acOutputReport,
-                            ObjectName: reportName,
-                            OutputFormat: AcFormat.acFormatPDF,
-                            OutputFile: pdfFilePath);
+                        // Export report as XML
+                        string xmlFilePath = Path.Combine(outputDir, $"{reportName}.xml");
                         
-                        Console.WriteLine($"Exported report PDF: {pdfFilePath}");
+                        // Use dynamic to access AcExportXMLObjectType enum
+                        dynamic objectType = 3; // 3 = acExportReport
+                        
+                        accessApp.DoCmd.ExportXML(
+                            objectType,
+                            reportName,
+                            xmlFilePath);
+                        
+                        Console.WriteLine($"Exported report XML: {xmlFilePath}");
+                        
+                        // Also try to export as PDF
+                        try
+                        {
+                            string pdfFilePath = Path.Combine(outputDir, $"{reportName}.pdf");
+                            
+                            // Use dynamic to access AcOutputObjectType and AcFormat enums
+                            dynamic acOutputReport = 3; // 3 = acOutputReport
+                            dynamic acFormatPDF = 1; // 1 = acFormatPDF
+                            
+                            accessApp.DoCmd.OutputTo(
+                                acOutputReport,
+                                reportName,
+                                acFormatPDF,
+                                pdfFilePath);
+                            
+                            Console.WriteLine($"Exported report PDF: {pdfFilePath}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"  Warning: Could not export {reportName} as PDF: {ex.Message}");
+                        }
+                        
+                        // Try to export as HTML as well
+                        try
+                        {
+                            string htmlFilePath = Path.Combine(outputDir, $"{reportName}.html");
+                            
+                            // Use dynamic to access AcOutputObjectType and AcFormat enums
+                            dynamic acOutputReport = 3; // 3 = acOutputReport
+                            dynamic acFormatHTML = 2; // 2 = acFormatHTML
+                            
+                            accessApp.DoCmd.OutputTo(
+                                acOutputReport,
+                                reportName,
+                                acFormatHTML,
+                                htmlFilePath);
+                            
+                            Console.WriteLine($"Exported report HTML: {htmlFilePath}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"  Warning: Could not export {reportName} as HTML: {ex.Message}");
+                        }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"  Warning: Could not export {reportName} as PDF: {ex.Message}");
+                        Console.WriteLine($"  Error exporting report {reportName}: {ex.Message}");
                     }
                     
-                    // Try to export as HTML as well
-                    try
+                    // Release COM object
+                    if (report != null)
                     {
-                        string htmlFilePath = Path.Combine(outputDir, $"{reportName}.html");
-                        accessApp.DoCmd.OutputTo(
-                            ObjectType: AcOutputObjectType.acOutputReport,
-                            ObjectName: reportName,
-                            OutputFormat: AcFormat.acFormatHTML,
-                            OutputFile: htmlFilePath);
-                        
-                        Console.WriteLine($"Exported report HTML: {htmlFilePath}");
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"  Warning: Could not export {reportName} as HTML: {ex.Message}");
+                        Marshal.ReleaseComObject(report);
                     }
                 }
-                catch (Exception ex)
+                
+                // Release COM object
+                if (allReports != null)
                 {
-                    Console.WriteLine($"  Error exporting report {reportName}: {ex.Message}");
+                    Marshal.ReleaseComObject(allReports);
                 }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error processing reports: {ex.Message}");
             }
             
             Console.WriteLine($"Report extraction complete. Reports saved to: {outputDir}");
