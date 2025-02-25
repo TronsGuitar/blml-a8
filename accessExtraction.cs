@@ -53,8 +53,9 @@ namespace AccessExtractor
 
             try
             {
-                // Create Access application COM object
-                accessApp = new Application();
+                // Create Access application COM object through late binding
+                Type accessType = Type.GetTypeFromProgID("Access.Application");
+                accessApp = (Application)Activator.CreateInstance(accessType);
                 
                 // Open the database
                 accessApp.Visible = false;
