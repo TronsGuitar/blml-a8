@@ -21,3 +21,32 @@ while (($bytesRead = $inputStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
 }
 
 $inputStream.Close()
+
+
+function Merge-Zip {
+    param (
+        [string]$outputFile,
+        [string]$inputDir
+    )
+
+    $partFiles = Get-ChildItem -Path $inputDir -Filter "*.part*" | Sort-Object Name
+    $outputStream = [System.IO.File]::OpenWrite($outputFile)
+
+    foreach ($partFile in $partFiles) {
+        $inputStream = [System.IO.File]::OpenRead($partFile.FullName)
+        $buffer = New-Object byte[] 1048576  # 1MB buffer size for efficiency
+
+        while (($bytesRead = $inputStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+            $outputStream.Write($buffer, 0, $bytesRead)
+        }
+        
+        $inputStream.Close()
+        Write-Output "Merged $($partFile.FullName), Size: $(($partFile.Length / 1GB).ToString('F2')) GB"
+    }
+
+    $outputStream.Close()
+    Write-Output "Successfully merged into $outputFile"
+}
+
+# Example usage:
+# Merge-Zip -outputFile "merged.zip" -inputDir "split_parts"
