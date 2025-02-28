@@ -19,14 +19,6 @@ if ($folderBrowserDialog.ShowDialog() -ne [System.Windows.Forms.DialogResult]::O
 }
 $outputDir = $folderBrowserDialog.SelectedPath
 
-$accessConnStr = "Provider=Microsoft.ACE.OLEDB.12.0;Data Source=C:\Path\To\YourDatabase.accdb;Persist Security Info=False;"
-$accessConnection = New-Object System.Data.OleDb.OleDbConnection($accessConnStr)
-$accessConnection.Open()
-$allTables = $accessConnection.GetSchema("Tables")
-$accessConnection.Close()
-
-$allTables | Format-Table TABLE_NAME, TABLE_TYPE -AutoSize
-
 # Create subdirectories for Models and Pages if they don't exist
 $modelsDir = Join-Path $outputDir "Models"
 $pagesDir = Join-Path $outputDir "Pages"
@@ -50,9 +42,11 @@ try {
     exit
 }
 
-# Get the list of user tables
-$tables = $accessConnection.GetSchema("Tables") | Where-Object { $_.TABLE_TYPE -eq "TABLE" }
-Write-Host "Found $($tables.Count) tables in the Access database."
+# Get the list of tables.
+# Include both local tables ("TABLE") and linked tables ("LINK").
+$allTables = $accessConnection.GetSchema("Tables")
+$tables = $allTables | Where-Object { @("TABLE", "LINK") -contains $_.TABLE_TYPE }
+Write-Host "Found $($tables.Count) user tables (local or linked) in the Access database."
 
 # Function to map Access data types to C# types
 function MapAccessToCSharpType($accessType) {
@@ -72,7 +66,12 @@ function MapAccessToCSharpType($accessType) {
 
 foreach ($table in $tables) {
     $tableName = $table.TABLE_NAME
-    Write-Host "Processing table: $tableName"
+    $tableType = $table.TABLE_TYPE
+    if ($tableType -eq "LINK") {
+        Write-Host "Processing linked table: $tableName"
+    } else {
+        Write-Host "Processing table: $tableName"
+    }
 
     # Get column schema for the table
     $colRestrictions = @($null, $null, $tableName, $null)
