@@ -1,9 +1,9 @@
 Add-Type -AssemblyName System.Windows.Forms
 
-# Helper function to sanitize field names.
-function SanitizeFieldName($fieldName) {
-    # Replace spaces, hyphens, and '#' with underscores.
-    $sanitized = $fieldName -replace '[\s\-#]', '_'
+# Helper function to sanitize names by removing all non-alphanumeric characters.
+function SanitizeName($name) {
+    # Remove all non-alphanumeric characters.
+    $sanitized = $name -replace '[^a-zA-Z0-9]', ''
     # If the sanitized name starts with a digit, add an underscore at the beginning.
     if ($sanitized -match '^[0-9]') {
         $sanitized = "_" + $sanitized
@@ -77,17 +77,19 @@ function MapAccessToCSharpType($accessType) {
     }
 }
 
-# List to hold table names for the main menu generation.
+# List to hold sanitized table names for the main menu generation.
 $tableNames = @()
 
 foreach ($table in $tables) {
     $tableName = $table.TABLE_NAME
-    $tableNames += $tableName
+    # Sanitize the table name.
+    $sanitizedTableName = SanitizeName $tableName
+    $tableNames += $sanitizedTableName
     $tableType = $table.TABLE_TYPE
     if ($tableType -eq "LINK") {
-        Write-Host "Processing linked table: $tableName"
+        Write-Host "Processing linked table: $tableName -> $sanitizedTableName"
     } else {
-        Write-Host "Processing table: $tableName"
+        Write-Host "Processing table: $tableName -> $sanitizedTableName"
     }
 
     # Filter the full columns list for the current table.
@@ -103,7 +105,7 @@ foreach ($table in $tables) {
     $modelProperties = ""
     foreach ($col in $columns) {
         $originalColName = $col.COLUMN_NAME
-        $sanitizedColName = SanitizeFieldName $originalColName
+        $sanitizedColName = SanitizeName $originalColName
         $dataType = $col.DATA_TYPE
         $csharpType = MapAccessToCSharpType $dataType
         $modelProperties += "        public $csharpType $sanitizedColName { get; set; }`r`n"
@@ -116,29 +118,29 @@ using System.Collections.Generic;
 
 namespace YourNamespace.Models
 {
-    public class $tableName
+    public class $sanitizedTableName
     {
 $modelProperties
     }
 }
 "@
-    $modelFile = Join-Path $modelsDir "$tableName.cs"
+    $modelFile = Join-Path $modelsDir "$sanitizedTableName.cs"
     Write-Host "Writing model file: $modelFile"
     $modelClass | Out-File -Encoding utf8 $modelFile
 
     # Create a folder for the table's Razor pages and PageModel.
-    $tablePageDir = Join-Path $pagesDir $tableName
+    $tablePageDir = Join-Path $pagesDir $sanitizedTableName
     if (!(Test-Path $tablePageDir)) { New-Item -ItemType Directory -Path $tablePageDir | Out-Null }
 
     # Generate the Razor Index page.
     $razorPage = @"
 @page
-@model YourNamespace.Pages.$tableName.IndexModel
+@model YourNamespace.Pages.$sanitizedTableName.IndexModel
 @{
-    ViewData["Title"] = "$tableName List";
+    ViewData["Title"] = "$sanitizedTableName List";
 }
 
-<h1>$tableName List</h1>
+<h1>$sanitizedTableName List</h1>
 
 <table>
     <thead>
@@ -146,7 +148,7 @@ $modelProperties
 "@
     foreach ($col in $columns) {
         $originalColName = $col.COLUMN_NAME
-        $sanitizedColName = SanitizeFieldName $originalColName
+        $sanitizedColName = SanitizeName $originalColName
         $razorPage += "            <th>$sanitizedColName</th>`r`n"
     }
     $razorPage += @"
@@ -160,7 +162,7 @@ $modelProperties
 "@
     foreach ($col in $columns) {
         $originalColName = $col.COLUMN_NAME
-        $sanitizedColName = SanitizeFieldName $originalColName
+        $sanitizedColName = SanitizeName $originalColName
         $razorPage += "                <td>@item.$sanitizedColName</td>`r`n"
     }
     $razorPage += @"
@@ -186,16 +188,16 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using YourNamespace.Models;
 using System.Collections.Generic;
 
-namespace YourNamespace.Pages.$tableName
+namespace YourNamespace.Pages.$sanitizedTableName
 {
     public class IndexModel : PageModel
     {
-        public List<$tableName> Items { get; set; }
+        public List<$sanitizedTableName> Items { get; set; }
 
         public void OnGet()
         {
             // TODO: Retrieve data from SQL Server.
-            Items = new List<$tableName>();
+            Items = new List<$sanitizedTableName>();
         }
     }
 }
@@ -216,8 +218,8 @@ $mainMenuContent = @"
 <h1>Main Menu</h1>
 <ul>
 "@
-foreach ($name in $tableNames) {
-    $mainMenuContent += "    <li><a asp-page='/$name/Index'>$name</a></li>`r`n"
+foreach ($sanitizedName in $tableNames) {
+    $mainMenuContent += "    <li><a asp-page='/$sanitizedName/Index'>$sanitizedName</a></li>`r`n"
 }
 $mainMenuContent += @"
 </ul>
