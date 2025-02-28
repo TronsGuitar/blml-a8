@@ -48,6 +48,9 @@ $allTables = $accessConnection.GetSchema("Tables")
 $tables = $allTables | Where-Object { @("TABLE", "LINK") -contains $_.TABLE_TYPE }
 Write-Host "Found $($tables.Count) user tables (local or linked) in the Access database."
 
+# Retrieve all columns once
+$allColumns = $accessConnection.GetSchema("Columns")
+
 # Function to map Access data types to C# types
 function MapAccessToCSharpType($accessType) {
     switch ($accessType) {
@@ -73,19 +76,18 @@ foreach ($table in $tables) {
         Write-Host "Processing table: $tableName"
     }
 
-    # Get column schema for the table
-    $colRestrictions = @($null, $null, $tableName, $null)
-    $columns = $accessConnection.GetSchema("Columns", $colRestrictions)
-    Write-Host "Found $($columns.Rows.Count) columns for table: $tableName"
+    # Filter the full columns list for the current table
+    $columns = $allColumns | Where-Object { $_.TABLE_NAME -eq $tableName }
+    Write-Host "Found $($columns.Count) columns for table: $tableName"
 
-    if ($columns.Rows.Count -eq 0) {
+    if ($columns.Count -eq 0) {
         Write-Host "Skipping table $tableName as no columns were found."
         continue
     }
 
     # Build the properties for the C# model
     $modelProperties = ""
-    foreach ($col in $columns.Rows) {
+    foreach ($col in $columns) {
         $colName = $col.COLUMN_NAME
         $dataType = $col.DATA_TYPE
         $csharpType = MapAccessToCSharpType $dataType
@@ -123,7 +125,7 @@ $modelProperties
     <thead>
         <tr>
 "@
-    foreach ($col in $columns.Rows) {
+    foreach ($col in $columns) {
         $razorPage += "            <th>$($col.COLUMN_NAME)</th>`r`n"
     }
     $razorPage += @"
@@ -135,26 +137,11 @@ $modelProperties
         {
             <tr>
 "@
-    foreach ($col in $columns.Rows) {
+    foreach ($col in $columns) {
         $razorPage += "                <td>@item.$($col.COLUMN_NAME)</td>`r`n"
     }
     $razorPage += @"
                 <td>
                     <a asp-page="".\Edit"" asp-route-id=""@item.Id"">Edit</a> |
                     <a asp-page="".\Details"" asp-route-id=""@item.Id"">Details</a> |
-                    <a asp-page="".\Delete"" asp-route-id=""@item.Id"">Delete</a>
-                </td>
-            </tr>
-        }
-    </tbody>
-</table>
-
-<a asp-page="".\Create"">Create New</a>
-"@
-    $razorFile = Join-Path $pagesDir "$tableName.Index.cshtml"
-    Write-Host "Writing Razor page: $razorFile"
-    $razorPage | Out-File -Encoding utf8 $razorFile
-}
-
-$accessConnection.Close()
-Write-Host "Code generation complete. Files are saved in $outputDir"
+                    <a asp-page="".\Delete"" asp-route-id=""@item.Id""
