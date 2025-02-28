@@ -11,7 +11,7 @@ function SanitizeFieldName($fieldName) {
     return $sanitized
 }
 
-# Prompt to select the Access database file
+# Prompt to select the Access database file.
 $openFileDialog = New-Object System.Windows.Forms.OpenFileDialog
 $openFileDialog.Filter = "Access Database (*.accdb)|*.accdb"
 $openFileDialog.Title = "Select Access Database File"
@@ -21,7 +21,7 @@ if ($openFileDialog.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
 }
 $accessFilePath = $openFileDialog.FileName
 
-# Prompt to select the output folder for generated code
+# Prompt to select the output folder for generated code.
 $folderBrowserDialog = New-Object System.Windows.Forms.FolderBrowserDialog
 $folderBrowserDialog.Description = "Select the output folder for generated Razor and C# code"
 if ($folderBrowserDialog.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
@@ -30,7 +30,7 @@ if ($folderBrowserDialog.ShowDialog() -ne [System.Windows.Forms.DialogResult]::O
 }
 $outputDir = $folderBrowserDialog.SelectedPath
 
-# Create subdirectories for Models and Pages if they don't exist
+# Create subdirectories for Models and Pages if they don't exist.
 $modelsDir = Join-Path $outputDir "Models"
 $pagesDir = Join-Path $outputDir "Pages"
 if (!(Test-Path $modelsDir)) { New-Item -ItemType Directory -Path $modelsDir | Out-Null }
@@ -41,10 +41,10 @@ Write-Host "Output directory: $outputDir"
 Write-Host "Models will be saved in: $modelsDir"
 Write-Host "Pages will be saved in: $pagesDir"
 
-# Connection string for the Access database
+# Connection string for the Access database.
 $accessConnStr = "Provider=Microsoft.ACE.OLEDB.12.0;Data Source=$accessFilePath;Persist Security Info=False;"
 
-# Open the Access connection
+# Open the Access connection.
 $accessConnection = New-Object System.Data.OleDb.OleDbConnection($accessConnStr)
 try {
     $accessConnection.Open()
@@ -53,32 +53,36 @@ try {
     exit
 }
 
-# Get the list of tables (including both local and linked tables).
+# Get the list of tables (including local and linked).
 $allTables = $accessConnection.GetSchema("Tables")
 $tables = $allTables | Where-Object { @("TABLE", "LINK") -contains $_.TABLE_TYPE }
 Write-Host "Found $($tables.Count) user tables (local or linked) in the Access database."
 
-# Retrieve all columns once
+# Retrieve all columns once.
 $allColumns = $accessConnection.GetSchema("Columns")
 
-# Function to map Access data types to C# types
+# Function to map Access data types to C# types.
 function MapAccessToCSharpType($accessType) {
     switch ($accessType) {
-        2   { return "short" }       # dbInteger
-        3   { return "int" }         # dbLong
-        4   { return "float" }       # dbSingle
-        5   { return "double" }      # dbDouble
-        6   { return "decimal" }     # dbCurrency
-        7   { return "DateTime" }    # dbDate
-        130 { return "string" }      # dbText
-        201 { return "string" }      # dbMemo
-        11  { return "bool" }        # dbBoolean
+        2   { return "short" }
+        3   { return "int" }
+        4   { return "float" }
+        5   { return "double" }
+        6   { return "decimal" }
+        7   { return "DateTime" }
+        130 { return "string" }
+        201 { return "string" }
+        11  { return "bool" }
         default { return "string" }
     }
 }
 
+# List to hold table names for the main menu generation.
+$tableNames = @()
+
 foreach ($table in $tables) {
     $tableName = $table.TABLE_NAME
+    $tableNames += $tableName
     $tableType = $table.TABLE_TYPE
     if ($tableType -eq "LINK") {
         Write-Host "Processing linked table: $tableName"
@@ -122,13 +126,16 @@ $modelProperties
     Write-Host "Writing model file: $modelFile"
     $modelClass | Out-File -Encoding utf8 $modelFile
 
-    # Generate a basic Razor Index page for listing items.
-    # Use the sanitized field names in the table headers and data bindings.
+    # Create a folder for the table's Razor pages and PageModel.
+    $tablePageDir = Join-Path $pagesDir $tableName
+    if (!(Test-Path $tablePageDir)) { New-Item -ItemType Directory -Path $tablePageDir | Out-Null }
+
+    # Generate the Razor Index page.
     $razorPage = @"
 @page
 @model YourNamespace.Pages.$tableName.IndexModel
 @{
-    ViewData[""Title""] = ""$tableName List"";
+    ViewData["Title"] = "$tableName List";
 }
 
 <h1>$tableName List</h1>
@@ -158,20 +165,44 @@ $modelProperties
     }
     $razorPage += @"
                 <td>
-                    <a asp-page="".\Edit"" asp-route-id=""@item.Id"">Edit</a> |
-                    <a asp-page="".\Details"" asp-route-id=""@item.Id"">Details</a> |
-                    <a asp-page="".\Delete"" asp-route-id=""@item.Id"">Delete</a>
+                    <a asp-page="./Edit" asp-route-id="@item.Id">Edit</a> |
+                    <a asp-page="./Details" asp-route-id="@item.Id">Details</a> |
+                    <a asp-page="./Delete" asp-route-id="@item.Id">Delete</a>
                 </td>
             </tr>
         }
     </tbody>
 </table>
 
-<a asp-page="".\Create"">Create New</a>
+<a asp-page="./Create">Create New</a>
 "@
-    $razorFile = Join-Path $pagesDir "$tableName.Index.cshtml"
+    $razorFile = Join-Path $tablePageDir "Index.cshtml"
     Write-Host "Writing Razor page: $razorFile"
     $razorPage | Out-File -Encoding utf8 $razorFile
+
+    # Generate the PageModel class for this table.
+    $pageModelContent = @"
+using Microsoft.AspNetCore.Mvc.RazorPages;
+using YourNamespace.Models;
+using System.Collections.Generic;
+
+namespace YourNamespace.Pages.$tableName
+{
+    public class IndexModel : PageModel
+    {
+        public List<$tableName> Items { get; set; }
+
+        public void OnGet()
+        {
+            // TODO: Retrieve data from SQL Server.
+            Items = new List<$tableName>();
+        }
+    }
+}
+"@
+    $pageModelFile = Join-Path $tablePageDir "Index.cshtml.cs"
+    Write-Host "Writing PageModel file: $pageModelFile"
+    $pageModelContent | Out-File -Encoding utf8 $pageModelFile
 }
 
 $accessConnection.Close()
@@ -180,15 +211,13 @@ $accessConnection.Close()
 $mainMenuContent = @"
 @page
 @{
-    ViewData[""Title""] = ""Main Menu"";
+    ViewData["Title"] = "Main Menu";
 }
 <h1>Main Menu</h1>
 <ul>
 "@
-foreach ($table in $tables) {
-    $tableName = $table.TABLE_NAME
-    # Assuming the generated Razor page route is "/<TableName>.Index"
-    $mainMenuContent += "    <li><a asp-page=""/$tableName.Index"">$tableName</a></li>`r`n"
+foreach ($name in $tableNames) {
+    $mainMenuContent += "    <li><a asp-page='/$name/Index'>$name</a></li>`r`n"
 }
 $mainMenuContent += @"
 </ul>
