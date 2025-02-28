@@ -19,6 +19,14 @@ if ($folderBrowserDialog.ShowDialog() -ne [System.Windows.Forms.DialogResult]::O
 }
 $outputDir = $folderBrowserDialog.SelectedPath
 
+$accessConnStr = "Provider=Microsoft.ACE.OLEDB.12.0;Data Source=C:\Path\To\YourDatabase.accdb;Persist Security Info=False;"
+$accessConnection = New-Object System.Data.OleDb.OleDbConnection($accessConnStr)
+$accessConnection.Open()
+$allTables = $accessConnection.GetSchema("Tables")
+$accessConnection.Close()
+
+$allTables | Format-Table TABLE_NAME, TABLE_TYPE -AutoSize
+
 # Create subdirectories for Models and Pages if they don't exist
 $modelsDir = Join-Path $outputDir "Models"
 $pagesDir = Join-Path $outputDir "Pages"
