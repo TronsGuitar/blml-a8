@@ -43,7 +43,6 @@ try {
 }
 
 # Get the list of tables.
-# Include both local tables ("TABLE") and linked tables ("LINK").
 $allTables = $accessConnection.GetSchema("Tables")
 $tables = $allTables | Where-Object { @("TABLE", "LINK") -contains $_.TABLE_TYPE }
 Write-Host "Found $($tables.Count) user tables (local or linked) in the Access database."
@@ -144,4 +143,19 @@ $modelProperties
                 <td>
                     <a asp-page="".\Edit"" asp-route-id=""@item.Id"">Edit</a> |
                     <a asp-page="".\Details"" asp-route-id=""@item.Id"">Details</a> |
-                    <a asp-page="".\Delete"" asp-route-id=""@item.Id""
+                    <a asp-page="".\Delete"" asp-route-id=""@item.Id"">Delete</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<a asp-page="".\Create"">Create New</a>
+"@
+    $razorFile = Join-Path $pagesDir "$tableName.Index.cshtml"
+    Write-Host "Writing Razor page: $razorFile"
+    $razorPage | Out-File -Encoding utf8 $razorFile
+}
+
+$accessConnection.Close()
+Write-Host "Code generation complete. Files are saved in $outputDir"
