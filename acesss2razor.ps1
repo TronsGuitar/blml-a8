@@ -1,5 +1,16 @@
 Add-Type -AssemblyName System.Windows.Forms
 
+# Helper function to sanitize field names.
+function SanitizeFieldName($fieldName) {
+    # Replace spaces, hyphens, and '#' with underscores.
+    $sanitized = $fieldName -replace '[\s\-#]', '_'
+    # If the sanitized name starts with a digit, add an underscore at the beginning.
+    if ($sanitized -match '^[0-9]') {
+        $sanitized = "_" + $sanitized
+    }
+    return $sanitized
+}
+
 # Prompt to select the Access database file
 $openFileDialog = New-Object System.Windows.Forms.OpenFileDialog
 $openFileDialog.Filter = "Access Database (*.accdb)|*.accdb"
@@ -42,7 +53,7 @@ try {
     exit
 }
 
-# Get the list of tables.
+# Get the list of tables (including both local and linked tables).
 $allTables = $accessConnection.GetSchema("Tables")
 $tables = $allTables | Where-Object { @("TABLE", "LINK") -contains $_.TABLE_TYPE }
 Write-Host "Found $($tables.Count) user tables (local or linked) in the Access database."
@@ -75,7 +86,7 @@ foreach ($table in $tables) {
         Write-Host "Processing table: $tableName"
     }
 
-    # Filter the full columns list for the current table
+    # Filter the full columns list for the current table.
     $columns = $allColumns | Where-Object { $_.TABLE_NAME -eq $tableName }
     Write-Host "Found $($columns.Count) columns for table: $tableName"
 
@@ -84,16 +95,17 @@ foreach ($table in $tables) {
         continue
     }
 
-    # Build the properties for the C# model
+    # Build the properties for the C# model using sanitized field names.
     $modelProperties = ""
     foreach ($col in $columns) {
-        $colName = $col.COLUMN_NAME
+        $originalColName = $col.COLUMN_NAME
+        $sanitizedColName = SanitizeFieldName $originalColName
         $dataType = $col.DATA_TYPE
         $csharpType = MapAccessToCSharpType $dataType
-        $modelProperties += "        public $csharpType $colName { get; set; }`r`n"
+        $modelProperties += "        public $csharpType $sanitizedColName { get; set; }`r`n"
     }
     
-    # Create the C# model class
+    # Create the C# model class.
     $modelClass = @"
 using System;
 using System.Collections.Generic;
@@ -110,7 +122,8 @@ $modelProperties
     Write-Host "Writing model file: $modelFile"
     $modelClass | Out-File -Encoding utf8 $modelFile
 
-    # Generate a basic Razor Index page for listing items
+    # Generate a basic Razor Index page for listing items.
+    # Use the sanitized field names in the table headers and data bindings.
     $razorPage = @"
 @page
 @model YourNamespace.Pages.$tableName.IndexModel
@@ -125,7 +138,9 @@ $modelProperties
         <tr>
 "@
     foreach ($col in $columns) {
-        $razorPage += "            <th>$($col.COLUMN_NAME)</th>`r`n"
+        $originalColName = $col.COLUMN_NAME
+        $sanitizedColName = SanitizeFieldName $originalColName
+        $razorPage += "            <th>$sanitizedColName</th>`r`n"
     }
     $razorPage += @"
             <th>Actions</th>
@@ -137,7 +152,9 @@ $modelProperties
             <tr>
 "@
     foreach ($col in $columns) {
-        $razorPage += "                <td>@item.$($col.COLUMN_NAME)</td>`r`n"
+        $originalColName = $col.COLUMN_NAME
+        $sanitizedColName = SanitizeFieldName $originalColName
+        $razorPage += "                <td>@item.$sanitizedColName</td>`r`n"
     }
     $razorPage += @"
                 <td>
@@ -158,4 +175,26 @@ $modelProperties
 }
 
 $accessConnection.Close()
+
+# Generate a Main Menu page that links to each table's Index page.
+$mainMenuContent = @"
+@page
+@{
+    ViewData[""Title""] = ""Main Menu"";
+}
+<h1>Main Menu</h1>
+<ul>
+"@
+foreach ($table in $tables) {
+    $tableName = $table.TABLE_NAME
+    # Assuming the generated Razor page route is "/<TableName>.Index"
+    $mainMenuContent += "    <li><a asp-page=""/$tableName.Index"">$tableName</a></li>`r`n"
+}
+$mainMenuContent += @"
+</ul>
+"@
+$mainMenuFile = Join-Path $pagesDir "MainMenu.cshtml"
+Write-Host "Writing Main Menu page: $mainMenuFile"
+$mainMenuContent | Out-File -Encoding utf8 $mainMenuFile
+
 Write-Host "Code generation complete. Files are saved in $outputDir"
