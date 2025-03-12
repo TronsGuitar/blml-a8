@@ -1,3 +1,6 @@
+
+
+
 Hi Brian, you can run that SQL query from PowerShell. A good approach is to use an OLE DB provider. For Access .mdb files, the Microsoft ACE OLEDB provider is a popular choice nowadays. It works on both 32-bit and 64-bit systems (provided you have the appropriate version of the Access Database Engine installed). If you're on a 32-bit system only, the Microsoft Jet OLEDB 4.0 provider is also an option, though it doesn't work with 64-bit PowerShell sessions.
 
 Here's a sample script that uses ACE:
