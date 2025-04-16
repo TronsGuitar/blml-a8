@@ -1,0 +1,65 @@
+@page "/reports"
+@page "/reports/{ReportName}"
+@using Microsoft.AspNetCore.Components.Web
+
+@if (!string.IsNullOrEmpty(ReportName))
+{
+    <h1>Report: @ReportName</h1>
+    <p>This area shows selection criteria and a placeholder for the generated report <strong>@ReportName</strong>.</p>
+
+    <div style="border: 1px dashed purple; padding: 20px; margin-bottom: 15px; background-color: #f5f0ff;">
+        <h5>Placeholder: Report Generation Options for @ReportName</h5>
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Date Range:</label>
+                <InputDate class="form-control" TValue="DateTime?"/>
+            </div>
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Category:</label>
+                <InputSelect class="form-select" TValue="string">
+                    <option value="">Select...</option>
+                    <option value="A">Alpha</option>
+                    <option value="B">Bravo</option>
+                </InputSelect>
+            </div>
+            <div class="col-md-4 mb-3 d-flex align-items-end">
+                 <button class="btn btn-info" @onclick="GenerateReport">Generate Report</button>
+            </div>
+        </div>
+    </div>
+
+    @if (_showReport)
+    {
+        <div style="border: 2px solid sienna; padding: 20px; background-color: #fff8f0;">
+            <h5>Placeholder: Generated Report View for @ReportName</h5>
+            <p>Imagine a report visualization appearing in this location.</p>
+            <p>Actual implementation requires a reporting component (like Bold Reports, Telerik Reporting, DevExpress Reports, or a custom Razor component) to render the data.</p>
+        </div>
+    }
+}
+else
+{
+     <h1>Reports Section</h1>
+    <p>Select a specific report from the navigation panel on the left.</p>
+}
+
+
+@code {
+    [Parameter]
+    public string? ReportName { get; set; }
+
+    private bool _showReport = false;
+
+    private void GenerateReport()
+    {
+        // Add logic here to fetch data and prepare the report
+        // based on selected criteria for the specific ReportName.
+        _showReport = true; // Show the placeholder area
+    }
+
+    protected override void OnParametersSet()
+    {
+        // Reset report visibility if the report name changes
+         _showReport = false;
+    }
+}
