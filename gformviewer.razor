@@ -1,0 +1,61 @@
+@page "/forms"
+@page "/forms/{FormName}"
+@using Microsoft.AspNetCore.Components.Web
+
+@if (!string.IsNullOrEmpty(FormName))
+{
+    <h1>Form: @FormName</h1>
+    <p>This area demonstrates various input controls representing the data entry form <strong>@FormName</strong>.</p>
+    <p>In a real application, these controls would be bound to a model using Blazor's data binding features (`@bind-Value`).</p>
+
+    <div style="border: 1px dashed green; padding: 20px; background-color: #f0fff0;">
+        <h5>Placeholder: Data Entry Controls for @FormName</h5>
+        <EditForm Model="@_dummyModel"> @* Use a dummy model or your actual model *@
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="mb-3">
+                <label for="textInput" class="form-label">Text Input:</label>
+                <InputText id="textInput" class="form-control" @bind-Value="_dummyModel.TextValue" />
+            </div>
+            <div class="mb-3">
+                <label for="numberInput" class="form-label">Number Input:</label>
+                <InputNumber id="numberInput" class="form-control" @bind-Value="_dummyModel.NumberValue" />
+            </div>
+             <div class="mb-3">
+                <label for="dateInput" class="form-label">Date Input:</label>
+                <InputDate id="dateInput" class="form-control" @bind-Value="_dummyModel.DateValue" />
+            </div>
+            <div class="form-check mb-3">
+                <InputCheckbox id="checkInput" class="form-check-input" @bind-Value="_dummyModel.BoolValue" />
+                <label for="checkInput" class="form-check-label">Checkbox Option</label>
+            </div>
+
+            <button type="submit" class="btn btn-success">Submit Form</button>
+        </EditForm>
+    </div>
+}
+else
+{
+     <h1>Forms Section</h1>
+    <p>Select a specific form from the navigation panel on the left to interact with it.</p>
+}
+
+@code {
+    [Parameter]
+    public string? FormName { get; set; }
+
+    // Dummy model for demonstration
+    private DummyModel _dummyModel = new DummyModel();
+
+    public class DummyModel
+    {
+        public string? TextValue { get; set; }
+        public int NumberValue { get; set; }
+        public DateTime DateValue { get; set; } = DateTime.Today;
+        public bool BoolValue { get; set; }
+    }
+
+    // Add code here to load the correct form definition/model
+    // based on the FormName.
+}
