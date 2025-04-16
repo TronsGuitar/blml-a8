@@ -1,0 +1,76 @@
+/* Add this to your existing app.css or create MainLayout.razor.css */
+
+html, body {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+/* Basic layout resembling Access */
+.page {
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    height: 100vh; /* Make layout fill the viewport height */
+    overflow: hidden; /* Prevent scrolling on the main container */
+}
+
+.sidebar {
+    background-image: linear-gradient(180deg, rgb(5, 39, 103) 0%, #3a0647 70%);
+    width: 250px; /* Fixed width for the nav panel */
+    height: 100vh; /* Full height */
+    overflow-y: auto; /* Allow scrolling if content exceeds height */
+    color: white; /* Basic text color */
+}
+
+.navmenu-container h5, .navmenu-container h6 {
+    color: #d7d7d7; /* Lighter color for headers */
+    padding-left: 0.5rem;
+}
+
+.navmenu-container hr {
+    border-color: rgba(255, 255, 255, 0.3); /* Lighter horizontal rules */
+}
+
+main {
+    flex: 1; /* Allow main content to take remaining space */
+    overflow-y: auto; /* Allow scrolling for the main content area */
+    height: 100vh; /* Ensure it tries to fill height */
+}
+
+.content {
+    padding-top: 1.1rem;
+}
+
+/* Style NavLink elements */
+.sidebar .nav-item {
+    font-size: 0.9rem;
+    padding-top: 0.2rem;
+    padding-bottom: 0.2rem;
+}
+
+.sidebar .nav-item a {
+    color: rgba(255,255,255,0.8);
+    border-radius: 4px;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    line-height: 2.5rem;
+    padding-left: 1rem; /* Indent links */
+}
+
+.sidebar .nav-item a.active {
+    background-color: rgba(255,255,255,0.25);
+    color: white;
+    font-weight: bold;
+}
+
+.sidebar .nav-item a:hover {
+    background-color: rgba(255,255,255,0.1);
+    color: white;
+}
+
+/* Ensure top-row doesn't interfere if you re-add it */
+/* .top-row { ... } */
+
+/* Add styles for button sizes, spacing etc. on Index.razor */
+/* .btn.w-100.p-3 { ... } */
+
