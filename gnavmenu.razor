@@ -1,0 +1,107 @@
+@inject NavigationManager NavigationManager
+
+<div class="navmenu-container p-3">
+    <h5>Navigation Objects</h5>
+    <hr />
+
+    @{
+        var currentUri = new Uri(NavigationManager.Uri);
+        // Get the first segment like "tables", "queries" etc.
+        string activeSection = currentUri.Segments.Length > 1 ? currentUri.Segments[1].TrimEnd('/') : string.Empty;
+    }
+
+    @* --- TABLES SECTION --- *@
+    <h6><span class="oi oi-list-rich" aria-hidden="true"></span> Tables</h6>
+    @if (activeSection == "tables")
+    {
+        <ul class="nav flex-column">
+            @for (int i = 1; i <= 6; i++)
+            {
+                var tableName = $"Table{i}";
+                <li class="nav-item px-3">
+                    <NavLink class="nav-link" href="@($"tables/{tableName}")">
+                        @tableName
+                    </NavLink>
+                </li>
+            }
+        </ul>
+    }
+    <hr />
+
+    @* --- QUERIES SECTION --- *@
+    <h6><span class="oi oi-magnifying-glass" aria-hidden="true"></span> Queries</h6>
+    @if (activeSection == "queries")
+    {
+        <ul class="nav flex-column">
+            @for (int i = 1; i <= 11; i++)
+            {
+                var queryName = $"Query{((char)('A' + i - 1))}"; // QueryA, QueryB...
+                <li class="nav-item px-3">
+                    <NavLink class="nav-link" href="@($"queries/{queryName}")">
+                        @queryName
+                    </NavLink>
+                </li>
+            }
+        </ul>
+    }
+     <hr />
+
+    @* --- FORMS SECTION --- *@
+    <h6><span class="oi oi-spreadsheet" aria-hidden="true"></span> Forms</h6>
+     @if (activeSection == "forms")
+    {
+        <ul class="nav flex-column">
+             @for (int i = 1; i <= 3; i++)
+             {
+                var formName = $"InputForm{i}";
+                 <li class="nav-item px-3">
+                     <NavLink class="nav-link" href="@($"forms/{formName}")">
+                        @formName
+                    </NavLink>
+                </li>
+             }
+        </ul>
+    }
+     <hr />
+
+    @* --- REPORTS SECTION --- *@
+    <h6><span class="oi oi-document" aria-hidden="true"></span> Reports</h6>
+     @if (activeSection == "reports")
+    {
+        <ul class="nav flex-column">
+             @for (int i = 1; i <= 3; i++)
+             {
+                var reportName = $"SummaryReport{i}";
+                 <li class="nav-item px-3">
+                     <NavLink class="nav-link" href="@($"reports/{reportName}")">
+                        @reportName
+                    </NavLink>
+                </li>
+             }
+        </ul>
+    }
+    @* Add other sections (ModuleFive, ModuleSix) similarly if needed *@
+
+</div>
+
+@code {
+    // No code needed here for basic functionality, logic is inline.
+    // For more complex state or data fetching, add code here.
+
+    protected override void OnInitialized()
+    {
+        // Force refresh when navigation changes to update the active section
+        NavigationManager.LocationChanged += HandleLocationChanged;
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        // Tell Blazor that the state has changed and the component should re-render
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= HandleLocationChanged;
+    }
+}
