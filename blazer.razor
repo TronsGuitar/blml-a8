@@ -1,0 +1,128 @@
+@* Blazor Server layout resembling MS Access *@ @page "/" @inherits LayoutComponentBase
+
+@using System.Data @inject NavigationManager Nav
+
+<PageTitle>Access-Like App</PageTitle>
+
+<div class="app-container">
+    <div class="left-panel">
+        <h4>Tables</h4>
+        @foreach (var table in Tables)
+        {
+            <button @onclick="() => Select("Table: " + table)">@table</button>
+        }<h4>Queries</h4>
+    @foreach (var query in Queries)
+    {
+        <button @onclick="() => Select("Query: " + query)">@query</button>
+    }
+
+    <h4>Forms</h4>
+    @foreach (var form in Forms)
+    {
+        <button @onclick="() => Select("Form: " + form)">@form</button>
+    }
+
+    <h4>Reports</h4>
+    @foreach (var report in Reports)
+    {
+        <button @onclick="() => Select("Report: " + report)">@report</button>
+    }
+</div>
+
+<div class="main-content">
+    <h2>@SelectedTitle</h2>
+
+    @if (SelectedTitle.StartsWith("Table"))
+    {
+        <EditableTable TableName="@SelectedTitle.Split(':')[1].Trim()" />
+    }
+    else if (SelectedTitle.StartsWith("Query"))
+    {
+        <div>
+            <textarea rows="10" class="sql-area">-- SQL for @SelectedTitle</textarea>
+            <button>Run Query</button>
+        </div>
+    }
+    else if (SelectedTitle.StartsWith("Form"))
+    {
+        <EditForm Model="FormModel">
+            <InputText @bind-Value="FormModel.Name" placeholder="Name" />
+            <InputText @bind-Value="FormModel.Email" placeholder="Email" />
+            <button type="submit">Save</button>
+        </EditForm>
+    }
+    else if (SelectedTitle.StartsWith("Report"))
+    {
+        <div>
+            <select>
+                <option>Option 1</option>
+                <option>Option 2</option>
+            </select>
+            <button>Generate Report</button>
+
+            <div class="report-box">
+                <!-- Simulated Report Output -->
+                <p>Report generated based on selection.</p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <p>Select a Table, Query, Form, or Report.</p>
+    }
+</div>
+
+</div>@code { string SelectedTitle = "";
+
+List<string> Tables = ["Customers", "Orders", "Products", "Invoices", "Employees", "Categories"];
+List<string> Queries = Enumerable.Range(1, 11).Select(i => $"Query{i}").ToList();
+List<string> Forms = ["Customer Entry", "Order Form", "Product Form"];
+List<string> Reports = ["Sales Report", "Inventory Report", "Employee Report"];
+
+dynamic FormModel = new System.Dynamic.ExpandoObject();
+
+void Select(string title)
+{
+    SelectedTitle = title;
+}
+
+}
+
+<style>
+    .app-container {
+        display: flex;
+        height: 100vh;
+        font-family: Segoe UI, sans-serif;
+    }
+
+    .left-panel {
+        width: 250px;
+        background-color: #f2f2f2;
+        padding: 1rem;
+        border-right: 1px solid #ccc;
+    }
+
+    .left-panel button {
+        display: block;
+        width: 100%;
+        margin-bottom: 5px;
+        text-align: left;
+    }
+
+    .main-content {
+        flex-grow: 1;
+        padding: 1rem;
+        overflow: auto;
+    }
+
+    .sql-area {
+        width: 100%;
+    }
+
+    .report-box {
+        margin-top: 1rem;
+        border: 1px solid #888;
+        padding: 1rem;
+        background-color: #f9f9f9;
+    }
+</style>
