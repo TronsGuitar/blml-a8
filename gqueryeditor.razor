@@ -1,0 +1,29 @@
+@page "/queries"
+@page "/queries/{QueryName}"
+@using Microsoft.AspNetCore.Components.Web
+
+@if (!string.IsNullOrEmpty(QueryName))
+{
+    <h1>Query: @QueryName</h1>
+    <p>This area provides a space for viewing or editing the SQL associated with <strong>@QueryName</strong>.</p>
+
+    <div style="border: 1px dashed blue; padding: 20px; background-color: #f0f8ff;">
+        <h5>Placeholder: SQL Editor for @QueryName</h5>
+        <textarea class="form-control" rows="10" placeholder="SELECT * FROM ... WHERE ... -- SQL for @QueryName would appear here.">
+        </textarea>
+        <button class="btn btn-primary mt-2">Execute Query</button>
+        <button class="btn btn-secondary mt-2">Save Query</button>
+    </div>
+}
+else
+{
+     <h1>Queries Section</h1>
+    <p>Select a specific query from the navigation panel on the left to view its definition.</p>
+}
+
+@code {
+    [Parameter]
+    public string? QueryName { get; set; }
+
+    // Add code here to load the SQL text for the specific QueryName.
+}
