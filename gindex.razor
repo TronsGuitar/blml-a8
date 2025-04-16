@@ -1,0 +1,54 @@
+@page "/"
+@inject NavigationManager NavigationManager
+
+<h1>Application Main Menu</h1>
+<p>Select a primary category to begin your investigation.</p>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            <button class="btn btn-primary w-100 p-3" @onclick="() => NavigateTo(\"/tables\")">
+                <span class="oi oi-list-rich" aria-hidden="true"></span> View Tables
+            </button>
+        </div>
+        <div class="col-md-4 mb-3">
+            <button class="btn btn-secondary w-100 p-3" @onclick="() => NavigateTo(\"/queries\")">
+                <span class="oi oi-magnifying-glass" aria-hidden="true"></span> Examine Queries
+            </button>
+        </div>
+        <div class="col-md-4 mb-3">
+            <button class="btn btn-success w-100 p-3" @onclick="() => NavigateTo(\"/forms\")">
+                <span class="oi oi-spreadsheet" aria-hidden="true"></span> Utilize Forms
+            </button>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            <button class="btn btn-info w-100 p-3" @onclick="() => NavigateTo(\"/reports\")">
+                <span class="oi oi-document" aria-hidden="true"></span> Generate Reports
+            </button>
+        </div>
+         <div class="col-md-4 mb-3">
+            <button class="btn btn-warning w-100 p-3" @onclick="() => NavigateTo(\"/module-five\")">
+                <span class="oi oi-puzzle-piece" aria-hidden="true"></span> Module Five Access
+            </button>
+        </div>
+         <div class="col-md-4 mb-3">
+            <button class="btn btn-danger w-100 p-3" @onclick="() => NavigateTo(\"/module-six\")">
+                <span class="oi oi-cog" aria-hidden="true"></span> Module Six Settings
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    // This page should ideally use a layout *without* the NavMenu,
+    // or the NavMenu should be hidden when on the "/" route.
+    // For simplicity here, we assume it might still show, but clicking
+    // navigates *into* the main structure.
+
+    private void NavigateTo(string uri)
+    {
+        NavigationManager.NavigateTo(uri);
+    }
+}
