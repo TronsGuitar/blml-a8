@@ -1,0 +1,38 @@
+@inherits LayoutComponentBase
+@inject NavigationManager NavigationManager
+
+<div class="page">
+
+    @* Conditionally hide NavMenu on the root page if desired *@
+    @if (!IsRootPage())
+    {
+        <div class="sidebar">
+            <NavMenu />
+        </div>
+    }
+
+    <main>
+        @* Removed the top row for a cleaner look, unless needed *@
+        @* <div class="top-row px-4"> *@
+        @* <a href="https://docs.microsoft.com/aspnet/" target="_blank">About</a> *@
+        @* </div> *@
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+@code {
+    private bool IsRootPage()
+    {
+        var currentUri = new Uri(NavigationManager.Uri);
+        return currentUri.AbsolutePath.TrimEnd('/') == string.Empty;
+        // Or check against specific initial route: return NavigationManager.Uri == NavigationManager.BaseUri;
+    }
+
+    // Suggestion: Add CSS for '.page', '.sidebar', 'main', '.content'
+    // in app.css or MainLayout.razor.css to create the desired layout.
+    // See wwwroot/css/app.css suggestion below.
+}
+
