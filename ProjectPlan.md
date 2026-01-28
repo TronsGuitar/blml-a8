@@ -1,9 +1,4 @@
-VB6 to C# Project Plan
-I'll prioritize the tasks and add a comprehensive Classic ASP to Angular/.NET Core section.
-
-####
-
-**VB6 to C# Converter - Prioritized Task List**
+# VB6 to C# Converter - Prioritized Task List
 
 ---
 
@@ -324,4 +319,8 @@ I'll prioritize the tasks and add a comprehensive Classic ASP to Angular/.NET Co
 
 **Total Timeline:** 6-7 months for core functionality
 
-Would you like me to drill down into any specific phase with detailed implementation steps?
+---
+
+## **FILE MAPPING TO PHASES**
+
+See [REORGANIZATION.md](REORGANIZATION.md) for detailed file organization according to this plan.
