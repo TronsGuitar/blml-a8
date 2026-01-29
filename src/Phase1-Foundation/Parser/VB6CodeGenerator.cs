@@ -142,8 +142,254 @@ namespace BLML.Phase1Foundation.Parser
                     .AddVariables(SyntaxFactory.VariableDeclarator(SyntaxFactory.Identifier(varDecl.Name)));
                 return SyntaxFactory.LocalDeclarationStatement(variable);
             }
+            if (node is ForStatementNode forStmt)
+            {
+                return GenerateForStatement(forStmt);
+            }
+            if (node is WhileStatementNode whileStmt)
+            {
+                return GenerateWhileStatement(whileStmt);
+            }
+            if (node is DoLoopStatementNode doStmt)
+            {
+                return GenerateDoLoopStatement(doStmt);
+            }
+            if (node is SelectCaseStatementNode selectStmt)
+            {
+                return GenerateSelectCaseStatement(selectStmt);
+            }
 
             return SyntaxFactory.EmptyStatement();
+        }
+
+        private StatementSyntax GenerateSelectCaseStatement(SelectCaseStatementNode node)
+        {
+            // VB6 Select Case is similar to C# switch, but more flexible
+            // For simple cases, we generate a switch. For complex cases (ranges, Is comparisons), we use if-else chains.
+
+            var testExpr = GenerateExpression(node.TestExpression);
+            var hasComplexCases = node.Cases.Any(c => c.IsRange || c.IsComparison || c.Values.Count > 1);
+
+            if (hasComplexCases)
+            {
+                // Generate if-else chain for complex cases
+                return GenerateSelectCaseAsIfElse(node, testExpr);
+            }
+            else
+            {
+                // Generate switch statement for simple cases
+                return GenerateSelectCaseAsSwitch(node, testExpr);
+            }
+        }
+
+        private StatementSyntax GenerateSelectCaseAsSwitch(SelectCaseStatementNode node, ExpressionSyntax testExpr)
+        {
+            var sections = new List<SwitchSectionSyntax>();
+
+            foreach (var caseClause in node.Cases)
+            {
+                if (caseClause.Values.Count > 0)
+                {
+                    var labels = caseClause.Values.Select(v =>
+                        (SwitchLabelSyntax)SyntaxFactory.CaseSwitchLabel(GenerateExpression(v))).ToList();
+
+                    var statements = caseClause.Body.Statements
+                        .Select(GenerateStatement)
+                        .Where(s => s != null)
+                        .ToList();
+                    statements.Add(SyntaxFactory.BreakStatement());
+
+                    sections.Add(SyntaxFactory.SwitchSection(
+                        SyntaxFactory.List(labels),
+                        SyntaxFactory.List(statements)));
+                }
+            }
+
+            // Add default case if there's a Case Else
+            if (node.CaseElseBlock != null)
+            {
+                var defaultStatements = node.CaseElseBlock.Statements
+                    .Select(GenerateStatement)
+                    .Where(s => s != null)
+                    .ToList();
+                defaultStatements.Add(SyntaxFactory.BreakStatement());
+
+                sections.Add(SyntaxFactory.SwitchSection(
+                    SyntaxFactory.SingletonList<SwitchLabelSyntax>(SyntaxFactory.DefaultSwitchLabel()),
+                    SyntaxFactory.List(defaultStatements)));
+            }
+
+            return SyntaxFactory.SwitchStatement(testExpr, SyntaxFactory.List(sections));
+        }
+
+        private StatementSyntax GenerateSelectCaseAsIfElse(SelectCaseStatementNode node, ExpressionSyntax testExpr)
+        {
+            StatementSyntax? result = null;
+            StatementSyntax? current = null;
+
+            foreach (var caseClause in node.Cases.AsEnumerable().Reverse())
+            {
+                ExpressionSyntax condition;
+
+                if (caseClause.IsComparison)
+                {
+                    // Case Is > 5 => testExpr > 5
+                    var op = caseClause.ComparisonOperator switch
+                    {
+                        ">" => SyntaxKind.GreaterThanExpression,
+                        "<" => SyntaxKind.LessThanExpression,
+                        ">=" => SyntaxKind.GreaterThanOrEqualExpression,
+                        "<=" => SyntaxKind.LessThanOrEqualExpression,
+                        "<>" => SyntaxKind.NotEqualsExpression,
+                        _ => SyntaxKind.EqualsExpression
+                    };
+                    condition = SyntaxFactory.BinaryExpression(op, testExpr, GenerateExpression(caseClause.Values[0]));
+                }
+                else if (caseClause.IsRange)
+                {
+                    // Case 1 To 10 => testExpr >= 1 && testExpr <= 10
+                    var startExpr = GenerateExpression(caseClause.Values[0]);
+                    var endExpr = GenerateExpression(caseClause.RangeEnd!);
+                    condition = SyntaxFactory.BinaryExpression(
+                        SyntaxKind.LogicalAndExpression,
+                        SyntaxFactory.BinaryExpression(SyntaxKind.GreaterThanOrEqualExpression, testExpr, startExpr),
+                        SyntaxFactory.BinaryExpression(SyntaxKind.LessThanOrEqualExpression, testExpr, endExpr));
+                }
+                else if (caseClause.Values.Count > 1)
+                {
+                    // Case 1, 2, 3 => testExpr == 1 || testExpr == 2 || testExpr == 3
+                    condition = caseClause.Values
+                        .Select(v => (ExpressionSyntax)SyntaxFactory.BinaryExpression(
+                            SyntaxKind.EqualsExpression, testExpr, GenerateExpression(v)))
+                        .Aggregate((left, right) => SyntaxFactory.BinaryExpression(SyntaxKind.LogicalOrExpression, left, right));
+                }
+                else
+                {
+                    // Case 1 => testExpr == 1
+                    condition = SyntaxFactory.BinaryExpression(
+                        SyntaxKind.EqualsExpression, testExpr, GenerateExpression(caseClause.Values[0]));
+                }
+
+                var bodyStatements = caseClause.Body.Statements.Select(GenerateStatement).Where(s => s != null);
+                var body = SyntaxFactory.Block(bodyStatements);
+
+                var elseClause = result != null ? SyntaxFactory.ElseClause(result) : null;
+                result = SyntaxFactory.IfStatement(condition, body, elseClause);
+            }
+
+            // Add Case Else as final else
+            if (node.CaseElseBlock != null && result is IfStatementSyntax ifResult)
+            {
+                var elseStatements = node.CaseElseBlock.Statements.Select(GenerateStatement).Where(s => s != null);
+                var elseBody = SyntaxFactory.Block(elseStatements);
+
+                // Find the deepest else clause and add Case Else there
+                result = AddElseToIfChain(ifResult, SyntaxFactory.ElseClause(elseBody));
+            }
+
+            return result ?? SyntaxFactory.EmptyStatement();
+        }
+
+        private IfStatementSyntax AddElseToIfChain(IfStatementSyntax ifStmt, ElseClauseSyntax elseClause)
+        {
+            if (ifStmt.Else == null)
+            {
+                return ifStmt.WithElse(elseClause);
+            }
+            else if (ifStmt.Else.Statement is IfStatementSyntax nestedIf)
+            {
+                return ifStmt.WithElse(SyntaxFactory.ElseClause(AddElseToIfChain(nestedIf, elseClause)));
+            }
+            return ifStmt;
+        }
+
+        private StatementSyntax GenerateForStatement(ForStatementNode node)
+        {
+            // For i = 1 To 10 Step 2  =>  for (int i = 1; i <= 10; i += 2)
+            var loopVar = node.LoopVariable;
+            var startExpr = GenerateExpression(node.StartValue);
+            var endExpr = GenerateExpression(node.EndValue);
+
+            // Declare and initialize loop variable
+            var declaration = SyntaxFactory.VariableDeclaration(
+                SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.IntKeyword)))
+                .AddVariables(SyntaxFactory.VariableDeclarator(loopVar)
+                    .WithInitializer(SyntaxFactory.EqualsValueClause(startExpr)));
+
+            // Condition: i <= end (or i >= end for negative step)
+            var condition = SyntaxFactory.BinaryExpression(
+                SyntaxKind.LessThanOrEqualExpression,
+                SyntaxFactory.IdentifierName(loopVar),
+                endExpr);
+
+            // Increment: i++ or i += step
+            ExpressionSyntax incrementExpr;
+            if (node.StepValue != null)
+            {
+                var stepExpr = GenerateExpression(node.StepValue);
+                incrementExpr = SyntaxFactory.AssignmentExpression(
+                    SyntaxKind.AddAssignmentExpression,
+                    SyntaxFactory.IdentifierName(loopVar),
+                    stepExpr);
+            }
+            else
+            {
+                incrementExpr = SyntaxFactory.PostfixUnaryExpression(
+                    SyntaxKind.PostIncrementExpression,
+                    SyntaxFactory.IdentifierName(loopVar));
+            }
+
+            // Body
+            var bodyStatements = node.Body.Statements.Select(GenerateStatement).Where(s => s != null);
+            var body = SyntaxFactory.Block(bodyStatements);
+
+            return SyntaxFactory.ForStatement(declaration, default, condition,
+                SyntaxFactory.SingletonSeparatedList(incrementExpr), body);
+        }
+
+        private StatementSyntax GenerateWhileStatement(WhileStatementNode node)
+        {
+            // While condition => while (condition)
+            var condition = GenerateExpression(node.Condition);
+            var bodyStatements = node.Body.Statements.Select(GenerateStatement).Where(s => s != null);
+            var body = SyntaxFactory.Block(bodyStatements);
+
+            return SyntaxFactory.WhileStatement(condition, body);
+        }
+
+        private StatementSyntax GenerateDoLoopStatement(DoLoopStatementNode node)
+        {
+            var bodyStatements = node.Body.Statements.Select(GenerateStatement).Where(s => s != null);
+            var body = SyntaxFactory.Block(bodyStatements);
+
+            // Handle condition
+            ExpressionSyntax condition;
+            if (node.Condition != null)
+            {
+                condition = GenerateExpression(node.Condition);
+                if (node.IsUntil)
+                {
+                    // Until => negate the condition
+                    condition = SyntaxFactory.PrefixUnaryExpression(SyntaxKind.LogicalNotExpression,
+                        SyntaxFactory.ParenthesizedExpression(condition));
+                }
+            }
+            else
+            {
+                // Infinite loop: Do ... Loop => while (true)
+                condition = SyntaxFactory.LiteralExpression(SyntaxKind.TrueLiteralExpression);
+            }
+
+            if (node.IsDoWhile)
+            {
+                // Do While/Until ... Loop => while (condition) { }
+                return SyntaxFactory.WhileStatement(condition, body);
+            }
+            else
+            {
+                // Do ... Loop While/Until => do { } while (condition)
+                return SyntaxFactory.DoStatement(body, condition);
+            }
         }
 
         private ExpressionSyntax GenerateExpression(ExpressionNode node)
@@ -186,6 +432,16 @@ namespace BLML.Phase1Foundation.Parser
             }
             if (node is InvocationExpressionNode invoke)
             {
+                // Check if this is a built-in VB6 function that needs special handling
+                if (invoke.Target is IdentifierExpressionNode targetIdent &&
+                    BuiltInFunctionHandler.IsBuiltInFunction(targetIdent.Name))
+                {
+                    // Generate argument strings for the built-in function handler
+                    var argStrings = invoke.Arguments.Select(a => GenerateExpression(a).ToFullString()).ToArray();
+                    var csharpCode = BuiltInFunctionHandler.GenerateCShrapCall(targetIdent.Name, argStrings);
+                    return SyntaxFactory.ParseExpression(csharpCode);
+                }
+
                 var args = invoke.Arguments.Select(a => SyntaxFactory.Argument(GenerateExpression(a))).ToArray();
                 return SyntaxFactory.InvocationExpression(GenerateExpression(invoke.Target))
                     .WithArgumentList(SyntaxFactory.ArgumentList(SyntaxFactory.SeparatedList(args)));

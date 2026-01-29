@@ -186,6 +186,14 @@ namespace BLML.Phase1Foundation.Parser
             {
                 case "if":
                     return ParseIfStatement();
+                case "for":
+                    return ParseForStatement();
+                case "while":
+                    return ParseWhileStatement();
+                case "do":
+                    return ParseDoLoopStatement();
+                case "select":
+                    return ParseSelectCaseStatement();
                 case "set":
                 case "let":
                     SkipToken(); // Skip Set/Let
@@ -193,6 +201,8 @@ namespace BLML.Phase1Foundation.Parser
                 case "dim":
                 case "static":
                     return ParseVariableDeclaration();
+                case "redim":
+                    return ParseReDimStatement();
                 default:
                     // If it's an identifier followed by an equal sign, it's an assignment
                     if (token.Type == TokenType.Identifier)
@@ -262,6 +272,226 @@ namespace BLML.Phase1Foundation.Parser
             return ifNode;
         }
 
+        private VB6SyntaxNode ParseForStatement()
+        {
+            SkipToken(); // Skip 'For'
+            var loopVar = GetToken()?.Value ?? "i";
+            Match("=");
+            var startExpr = ParseExpression();
+            Match("To");
+            var endExpr = ParseExpression();
+
+            VB6SyntaxNode? stepExpr = null;
+            if (Match("Step"))
+            {
+                stepExpr = ParseExpression();
+            }
+
+            var forNode = new VB6SyntaxNode { Type = NodeType.Statement, Value = "For" };
+            forNode.Attributes["LoopVariable"] = loopVar;
+            if (startExpr != null) forNode.Children.Add(startExpr);
+            if (endExpr != null) forNode.Children.Add(endExpr);
+            if (stepExpr != null) forNode.Children.Add(stepExpr);
+
+            // Parse body
+            var bodyNode = new VB6SyntaxNode { Type = NodeType.Statement, Value = "ForBody" };
+            while (PeekToken() != null && !PeekToken().Value.Equals("Next", StringComparison.OrdinalIgnoreCase))
+            {
+                var stmt = ParseStatement();
+                if (stmt != null) bodyNode.Children.Add(stmt);
+            }
+            forNode.Children.Add(bodyNode);
+
+            Match("Next");
+            // Optionally consume the loop variable after Next
+            var nextToken = PeekToken();
+            if (nextToken != null && nextToken.Type == TokenType.Identifier &&
+                nextToken.Value.Equals(loopVar, StringComparison.OrdinalIgnoreCase))
+            {
+                SkipToken();
+            }
+
+            return forNode;
+        }
+
+        private VB6SyntaxNode ParseWhileStatement()
+        {
+            SkipToken(); // Skip 'While'
+            var condition = ParseExpression();
+
+            var whileNode = new VB6SyntaxNode { Type = NodeType.Statement, Value = "While" };
+            if (condition != null) whileNode.Children.Add(condition);
+
+            // Parse body
+            var bodyNode = new VB6SyntaxNode { Type = NodeType.Statement, Value = "WhileBody" };
+            while (PeekToken() != null && !PeekToken().Value.Equals("Wend", StringComparison.OrdinalIgnoreCase))
+            {
+                var stmt = ParseStatement();
+                if (stmt != null) bodyNode.Children.Add(stmt);
+            }
+            whileNode.Children.Add(bodyNode);
+
+            Match("Wend");
+            return whileNode;
+        }
+
+        private VB6SyntaxNode ParseDoLoopStatement()
+        {
+            SkipToken(); // Skip 'Do'
+            var doNode = new VB6SyntaxNode { Type = NodeType.Statement, Value = "Do" };
+
+            // Check for Do While/Until at start
+            bool isDoWhile = false;
+            bool isUntil = false;
+            if (Match("While"))
+            {
+                isDoWhile = true;
+                var condition = ParseExpression();
+                if (condition != null) doNode.Children.Add(condition);
+            }
+            else if (Match("Until"))
+            {
+                isDoWhile = true;
+                isUntil = true;
+                var condition = ParseExpression();
+                if (condition != null) doNode.Children.Add(condition);
+            }
+
+            doNode.Attributes["IsDoWhile"] = isDoWhile.ToString();
+            doNode.Attributes["IsUntil"] = isUntil.ToString();
+
+            // Parse body
+            var bodyNode = new VB6SyntaxNode { Type = NodeType.Statement, Value = "DoBody" };
+            while (PeekToken() != null && !PeekToken().Value.Equals("Loop", StringComparison.OrdinalIgnoreCase))
+            {
+                var stmt = ParseStatement();
+                if (stmt != null) bodyNode.Children.Add(stmt);
+            }
+            doNode.Children.Add(bodyNode);
+
+            Match("Loop");
+
+            // Check for Loop While/Until at end
+            if (!isDoWhile)
+            {
+                if (Match("While"))
+                {
+                    var condition = ParseExpression();
+                    if (condition != null) doNode.Children.Insert(0, condition);
+                }
+                else if (Match("Until"))
+                {
+                    doNode.Attributes["IsUntil"] = "True";
+                    var condition = ParseExpression();
+                    if (condition != null) doNode.Children.Insert(0, condition);
+                }
+            }
+
+            return doNode;
+        }
+
+        private VB6SyntaxNode ParseSelectCaseStatement()
+        {
+            SkipToken(); // Skip 'Select'
+            Match("Case"); // Skip 'Case'
+            var testExpr = ParseExpression();
+
+            var selectNode = new VB6SyntaxNode { Type = NodeType.Statement, Value = "Select" };
+            if (testExpr != null) selectNode.Children.Add(testExpr);
+
+            // Parse Case clauses
+            while (PeekToken() != null)
+            {
+                var token = PeekToken();
+                if (token.Value.Equals("End", StringComparison.OrdinalIgnoreCase))
+                {
+                    var next = tokens.ElementAtOrDefault(currentTokenIndex + 1);
+                    if (next != null && next.Value.Equals("Select", StringComparison.OrdinalIgnoreCase))
+                    {
+                        SkipToken(); // Skip 'End'
+                        SkipToken(); // Skip 'Select'
+                        break;
+                    }
+                }
+
+                if (Match("Case"))
+                {
+                    // Check for Case Else
+                    if (Match("Else"))
+                    {
+                        var caseElseNode = new VB6SyntaxNode { Type = NodeType.Statement, Value = "CaseElse" };
+                        // Parse statements until End Select
+                        while (PeekToken() != null &&
+                               !PeekToken().Value.Equals("End", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var stmt = ParseStatement();
+                            if (stmt != null) caseElseNode.Children.Add(stmt);
+                        }
+                        selectNode.Children.Add(caseElseNode);
+                    }
+                    else
+                    {
+                        var caseNode = new VB6SyntaxNode { Type = NodeType.Statement, Value = "Case" };
+
+                        // Parse case values (can be multiple separated by commas)
+                        // Also handles: Case 1 To 10, Case Is > 5
+                        do
+                        {
+                            // Check for "Is" comparison
+                            if (Match("Is"))
+                            {
+                                caseNode.Attributes["IsComparison"] = "True";
+                                var opToken = GetToken();
+                                if (opToken != null)
+                                {
+                                    caseNode.Attributes["ComparisonOperator"] = opToken.Value;
+                                }
+                                var valueExpr = ParseExpression();
+                                if (valueExpr != null) caseNode.Children.Add(valueExpr);
+                            }
+                            else
+                            {
+                                var valueExpr = ParseExpression();
+                                if (valueExpr != null)
+                                {
+                                    // Check for "To" range
+                                    if (Match("To"))
+                                    {
+                                        caseNode.Attributes["IsRange"] = "True";
+                                        var rangeEndExpr = ParseExpression();
+                                        caseNode.Children.Add(valueExpr);
+                                        if (rangeEndExpr != null) caseNode.Children.Add(rangeEndExpr);
+                                    }
+                                    else
+                                    {
+                                        caseNode.Children.Add(valueExpr);
+                                    }
+                                }
+                            }
+                        } while (Match(","));
+
+                        // Parse body node
+                        var bodyNode = new VB6SyntaxNode { Type = NodeType.Statement, Value = "CaseBody" };
+                        while (PeekToken() != null &&
+                               !PeekToken().Value.Equals("Case", StringComparison.OrdinalIgnoreCase) &&
+                               !PeekToken().Value.Equals("End", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var stmt = ParseStatement();
+                            if (stmt != null) bodyNode.Children.Add(stmt);
+                        }
+                        caseNode.Children.Add(bodyNode);
+                        selectNode.Children.Add(caseNode);
+                    }
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            return selectNode;
+        }
+
         private VB6SyntaxNode ParseExpression()
         {
             return ParseBinaryExpression(0);
@@ -274,6 +504,9 @@ namespace BLML.Phase1Foundation.Parser
             {
                 var token = PeekToken();
                 if (token == null || token.Type != TokenType.Operator) break;
+
+                // Don't treat delimiters like ) , as binary operators - they terminate expressions
+                if (token.Value == ")" || token.Value == ",") break;
 
                 int opPrecedence = GetOperatorPrecedence(token.Value);
                 if (opPrecedence < precedence) break;
@@ -353,16 +586,61 @@ namespace BLML.Phase1Foundation.Parser
             return propNode;
         }
 
+        private VB6SyntaxNode ParseReDimStatement()
+        {
+            SkipToken(); // Skip 'ReDim'
+
+            var reDimNode = new VB6SyntaxNode { Type = NodeType.Statement, Value = "ReDim" };
+
+            // Check for Preserve keyword
+            if (Match("Preserve"))
+            {
+                reDimNode.Attributes["Preserve"] = "true";
+            }
+
+            // Get variable name
+            var varName = GetToken()?.Value ?? "UnknownVariable";
+            reDimNode.Attributes["VariableName"] = varName;
+
+            // Parse new dimensions
+            if (Match("("))
+            {
+                while (PeekToken() != null && PeekToken().Value != ")")
+                {
+                    var dimExpr = ParseExpression();
+                    if (dimExpr != null) reDimNode.Children.Add(dimExpr);
+                    if (!Match(",")) break;
+                }
+                Match(")");
+            }
+
+            return reDimNode;
+        }
+
         private VB6SyntaxNode ParseVariableDeclaration(bool isParameter = false)
         {
             var startToken = PeekToken();
             if (!isParameter) SkipToken(); // Skip 'Dim', 'Public', etc.
-            
+
             var name = GetToken()?.Value ?? "UnknownVariable";
             var varNode = new VB6SyntaxNode { Type = NodeType.Variable, Value = name };
-            
+
             if (isParameter) varNode.Attributes["IsParameter"] = "true";
             if (startToken != null) varNode.Attributes["Accessibility"] = startToken.Value;
+
+            // Check for array declaration: Dim arr(10) or Dim arr()
+            if (Match("("))
+            {
+                varNode.Attributes["IsArray"] = "true";
+                // Parse array dimensions
+                while (PeekToken() != null && PeekToken().Value != ")")
+                {
+                    var dimExpr = ParseExpression();
+                    if (dimExpr != null) varNode.Children.Add(dimExpr);
+                    if (!Match(",")) break;
+                }
+                Match(")");
+            }
 
             if (Match("As"))
             {
@@ -372,7 +650,7 @@ namespace BLML.Phase1Foundation.Parser
             {
                 varNode.Attributes["Type"] = "Variant";
             }
-            
+
             return varNode;
         }
 
