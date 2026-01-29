@@ -509,8 +509,21 @@ namespace BLML.Phase1Foundation.AST
                 Name = node.Value,
                 Type = node.Attributes.GetValueOrDefault("Type", "Variant"),
                 Accessibility = DetermineAccessibility(node),
-                InitialValue = node.Attributes.GetValueOrDefault("InitialValue", "")
+                InitialValue = node.Attributes.GetValueOrDefault("InitialValue", ""),
+                IsArray = node.Attributes.GetValueOrDefault("IsArray", "false").Equals("true", StringComparison.OrdinalIgnoreCase)
             };
+
+            // Add array dimensions
+            if (varDecl.IsArray)
+            {
+                foreach (var child in node.Children)
+                {
+                    var dimExpr = BuildExpression(child);
+                    if (dimExpr != null) varDecl.ArrayDimensions.Add(dimExpr);
+                }
+            }
+
+            return varDecl;
         }
 
         private StatementNode BuildStatement(VB6SyntaxNode node)
@@ -571,6 +584,22 @@ namespace BLML.Phase1Foundation.AST
                             Expression = BuildExpression(node.Children[0])
                         };
                     }
+                    if (node.Value == "For")
+                    {
+                        return BuildForStatement(node);
+                    }
+                    if (node.Value == "While")
+                    {
+                        return BuildWhileStatement(node);
+                    }
+                    if (node.Value == "Do")
+                    {
+                        return BuildDoLoopStatement(node);
+                    }
+                    if (node.Value == "Select")
+                    {
+                        return BuildSelectCaseStatement(node);
+                    }
                     return null;
                 default:
                     return null;
@@ -612,6 +641,167 @@ namespace BLML.Phase1Foundation.AST
             }
 
             return new IdentifierExpressionNode { Name = node.Value };
+        }
+
+        private ForStatementNode BuildForStatement(VB6SyntaxNode node)
+        {
+            var forStmt = new ForStatementNode
+            {
+                LoopVariable = node.Attributes.GetValueOrDefault("LoopVariable", "i")
+            };
+
+            // First two children are start and end expressions
+            if (node.Children.Count >= 2)
+            {
+                forStmt.StartValue = BuildExpression(node.Children[0])!;
+                forStmt.EndValue = BuildExpression(node.Children[1])!;
+            }
+
+            // Check for step value (third child if not ForBody)
+            int bodyIndex = 2;
+            if (node.Children.Count > 2 && node.Children[2].Value != "ForBody")
+            {
+                forStmt.StepValue = BuildExpression(node.Children[2]);
+                bodyIndex = 3;
+            }
+
+            // Build body
+            var bodyNode = node.Children.FirstOrDefault(c => c.Value == "ForBody");
+            if (bodyNode != null)
+            {
+                foreach (var stmt in bodyNode.Children)
+                {
+                    var buildStmt = BuildStatement(stmt);
+                    if (buildStmt != null) forStmt.Body.Statements.Add(buildStmt);
+                }
+            }
+
+            return forStmt;
+        }
+
+        private WhileStatementNode BuildWhileStatement(VB6SyntaxNode node)
+        {
+            var whileStmt = new WhileStatementNode();
+
+            // First child is the condition
+            if (node.Children.Count > 0 && node.Children[0].Value != "WhileBody")
+            {
+                whileStmt.Condition = BuildExpression(node.Children[0])!;
+            }
+
+            // Build body
+            var bodyNode = node.Children.FirstOrDefault(c => c.Value == "WhileBody");
+            if (bodyNode != null)
+            {
+                foreach (var stmt in bodyNode.Children)
+                {
+                    var buildStmt = BuildStatement(stmt);
+                    if (buildStmt != null) whileStmt.Body.Statements.Add(buildStmt);
+                }
+            }
+
+            return whileStmt;
+        }
+
+        private DoLoopStatementNode BuildDoLoopStatement(VB6SyntaxNode node)
+        {
+            var doStmt = new DoLoopStatementNode
+            {
+                IsDoWhile = node.Attributes.GetValueOrDefault("IsDoWhile", "False").Equals("True", StringComparison.OrdinalIgnoreCase),
+                IsUntil = node.Attributes.GetValueOrDefault("IsUntil", "False").Equals("True", StringComparison.OrdinalIgnoreCase)
+            };
+
+            // First non-body child is the condition (if any)
+            var conditionNode = node.Children.FirstOrDefault(c => c.Value != "DoBody");
+            if (conditionNode != null)
+            {
+                doStmt.Condition = BuildExpression(conditionNode);
+            }
+
+            // Build body
+            var bodyNode = node.Children.FirstOrDefault(c => c.Value == "DoBody");
+            if (bodyNode != null)
+            {
+                foreach (var stmt in bodyNode.Children)
+                {
+                    var buildStmt = BuildStatement(stmt);
+                    if (buildStmt != null) doStmt.Body.Statements.Add(buildStmt);
+                }
+            }
+
+            return doStmt;
+        }
+
+        private SelectCaseStatementNode BuildSelectCaseStatement(VB6SyntaxNode node)
+        {
+            var selectStmt = new SelectCaseStatementNode();
+
+            // First child is the test expression
+            if (node.Children.Count > 0 && node.Children[0].Type == NodeType.Expression)
+            {
+                selectStmt.TestExpression = BuildExpression(node.Children[0])!;
+            }
+
+            // Process Case clauses
+            foreach (var child in node.Children.Where(c => c.Value == "Case" || c.Value == "CaseElse"))
+            {
+                if (child.Value == "CaseElse")
+                {
+                    selectStmt.CaseElseBlock = new BlockNode();
+                    foreach (var stmt in child.Children)
+                    {
+                        var buildStmt = BuildStatement(stmt);
+                        if (buildStmt != null) selectStmt.CaseElseBlock.Statements.Add(buildStmt);
+                    }
+                }
+                else
+                {
+                    var caseClause = new CaseClauseNode();
+
+                    // Check for comparison or range
+                    caseClause.IsComparison = child.Attributes.GetValueOrDefault("IsComparison", "False")
+                        .Equals("True", StringComparison.OrdinalIgnoreCase);
+                    caseClause.IsRange = child.Attributes.GetValueOrDefault("IsRange", "False")
+                        .Equals("True", StringComparison.OrdinalIgnoreCase);
+
+                    if (caseClause.IsComparison)
+                    {
+                        caseClause.ComparisonOperator = child.Attributes.GetValueOrDefault("ComparisonOperator", "=");
+                    }
+
+                    // Get case values (non-body children)
+                    var bodyNode = child.Children.FirstOrDefault(c => c.Value == "CaseBody");
+                    foreach (var valueChild in child.Children.Where(c => c.Value != "CaseBody"))
+                    {
+                        var expr = BuildExpression(valueChild);
+                        if (expr != null)
+                        {
+                            if (caseClause.IsRange && caseClause.Values.Count == 1)
+                            {
+                                caseClause.RangeEnd = expr;
+                            }
+                            else
+                            {
+                                caseClause.Values.Add(expr);
+                            }
+                        }
+                    }
+
+                    // Build body
+                    if (bodyNode != null)
+                    {
+                        foreach (var stmt in bodyNode.Children)
+                        {
+                            var buildStmt = BuildStatement(stmt);
+                            if (buildStmt != null) caseClause.Body.Statements.Add(buildStmt);
+                        }
+                    }
+
+                    selectStmt.Cases.Add(caseClause);
+                }
+            }
+
+            return selectStmt;
         }
 
         private VB6Accessibility DetermineAccessibility(VB6SyntaxNode node)
