@@ -1,0 +1,41 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  BLML.Transpiler -> D:\code\BLML\src\bin\Debug\net8.0\BLML.Transpiler.dll
+  BLML.Tests -> D:\code\BLML\tests\BLML.Tests\bin\Debug\net8.0\BLML.Tests.dll
+Test run for D:\code\BLML\tests\BLML.Tests\bin\Debug\net8.0\BLML.Tests.dll (.NETCoreApp,Version=v8.0)
+VSTest version 18.0.1 (x64)
+
+Starting test execution, please wait...
+A total of 1 test files matched the specified pattern.
+[xUnit.net 00:00:00.21]     BLML.Tests.TranspilerTests.Parser_ShouldParseBasicSub [FAIL]
+[xUnit.net 00:00:00.21]     BLML.Tests.TranspilerTests.Parser_ShouldHandleBuiltInFunctions [FAIL]
+[xUnit.net 00:00:00.22]     BLML.Tests.TranspilerTests.Parser_ShouldParseIfStatement [FAIL]
+  Failed BLML.Tests.TranspilerTests.Parser_ShouldParseBasicSub [14 ms]
+  Error Message:
+   Assert.Contains() Failure: Sub-string not found
+String:    "using System;\r\n\r\npublic partial class Mod"···
+Not found: "x = 10"
+  Stack Trace:
+     at BLML.Tests.TranspilerTests.Parser_ShouldParseBasicSub() in D:\code\BLML\tests\BLML.Tests\TranspilerTests.cs:line 31
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Failed BLML.Tests.TranspilerTests.Parser_ShouldHandleBuiltInFunctions [8 ms]
+  Error Message:
+   Assert.Contains() Failure: Sub-string not found
+String:    "using System;\r\n\r\npublic partial class Mod"···
+Not found: "s.Length"
+  Stack Trace:
+     at BLML.Tests.TranspilerTests.Parser_ShouldHandleBuiltInFunctions() in D:\code\BLML\tests\BLML.Tests\TranspilerTests.cs:line 65
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Failed BLML.Tests.TranspilerTests.Parser_ShouldParseIfStatement [5 ms]
+  Error Message:
+   Assert.Contains() Failure: Sub-string not found
+String:    "using System;\r\n\r\npublic partial class Mod"···
+Not found: "if (y > 10)"
+  Stack Trace:
+     at BLML.Tests.TranspilerTests.Parser_ShouldParseIfStatement() in D:\code\BLML\tests\BLML.Tests\TranspilerTests.cs:line 49
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+
+Failed!  - Failed:     3, Passed:     3, Skipped:     0, Total:     6, Duration: 123 ms - BLML.Tests.dll (net8.0)
