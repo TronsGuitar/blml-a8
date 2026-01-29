@@ -2,9 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
+<<<<<<< HEAD
 public class BuiltInFunctionsParser
 {
     private static readonly Dictionary<string, Func<string, string>> BuiltInFunctions = new Dictionary<string, Func<string, string>>
+=======
+public class VB6Parser
+{
+    private static readonly Dictionary<string, Func<string, string>> BuiltInFunctions = new()
+>>>>>>> 270eef1 (Reorganize repository structure)
     {
         { "Mid", ParseMidFunction },
         { "Left", ParseLeftFunction },
@@ -52,7 +58,11 @@ public class BuiltInFunctionsParser
     {
         foreach (var functionName in BuiltInFunctions.Keys)
         {
+<<<<<<< HEAD
             string pattern = $@"\b{functionName}\s*\((.*?)\)";
+=======
+            string pattern = $"\b{functionName}\s*\((.*?)\)";
+>>>>>>> 270eef1 (Reorganize repository structure)
             var match = Regex.Match(expression, pattern, RegexOptions.IgnoreCase);
 
             if (match.Success)

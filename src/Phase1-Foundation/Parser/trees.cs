@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+<<<<<<< HEAD
 
 // Example Usage:
 // This part assumes top-level statements are allowed (C# 9.0+)
@@ -60,6 +61,60 @@ class TreesDemo
             // as it's often a static pointer managed by the DLL.
         }
     }
+=======
+// Example Usage:
+IntPtr parserPtr = IntPtr.Zero;
+IntPtr languagePtr = IntPtr.Zero;
+
+try
+{
+    // Get the language pointer from your specific DLL
+    languagePtr = NativeMethods.GetLanguage();
+    if (languagePtr == IntPtr.Zero)
+    {
+        Console.WriteLine("Error: Could not load language.");
+        return;
+    }
+
+    // Create a new parser instance
+    parserPtr = NativeMethods.ts_parser_new();
+    if (parserPtr == IntPtr.Zero)
+    {
+        Console.WriteLine("Error: Could not create parser.");
+        return;
+    }
+
+    // Set the language for the parser
+    bool languageSet = NativeMethods.ts_parser_set_language(parserPtr, languagePtr);
+    if (!languageSet)
+    {
+        Console.WriteLine("Error: Could not set parser language.");
+        // Potentially indicates an ABI version mismatch between the core
+        // library and the language grammar DLL.
+        return;
+    }
+
+    Console.WriteLine("Successfully loaded language and initialized parser.");
+
+    // --- Now you can use the parser ---
+    // Example: Parse a string (requires importing ts_parser_parse_string, etc.)
+    // string sourceCode = "your code here";
+    // byte sourceBytes = System.Text.Encoding.UTF8.GetBytes(sourceCode);
+    // IntPtr treePtr = NativeMethods.ts_parser_parse_string(parserPtr, IntPtr.Zero, sourceBytes, (uint)sourceBytes.Length);
+    //... process the tree...
+    // NativeMethods.ts_tree_delete(treePtr);
+
+}
+finally
+{
+    // Clean up the parser
+    if (parserPtr!= IntPtr.Zero)
+    {
+        NativeMethods.ts_parser_delete(parserPtr);
+    }
+    // Note: You generally don't delete the language pointer itself,
+    // as it's often a static pointer managed by the DLL.
+>>>>>>> 270eef1 (Reorganize repository structure)
 }
 
 internal static class NativeMethods

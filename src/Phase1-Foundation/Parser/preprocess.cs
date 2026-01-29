@@ -2,7 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
+<<<<<<< HEAD
 using System.Linq;
+=======
+>>>>>>> 270eef1 (Reorganize repository structure)
 
 class VB6ToCSharpPreparer
 {
