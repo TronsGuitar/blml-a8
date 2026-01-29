@@ -1,0 +1,13 @@
+D:\code\BLML\src\obj\Debug\net8.0\BLML.Transpiler.csproj.AssemblyReference.cache
+D:\code\BLML\src\obj\Debug\net8.0\BLML.Transpiler.GeneratedMSBuildEditorConfig.editorconfig
+D:\code\BLML\src\obj\Debug\net8.0\BLML.Transpiler.AssemblyInfoInputs.cache
+D:\code\BLML\src\obj\Debug\net8.0\BLML.Transpiler.AssemblyInfo.cs
+D:\code\BLML\src\obj\Debug\net8.0\BLML.Transpiler.csproj.CoreCompileInputs.cache
+D:\code\BLML\src\obj\Debug\net8.0\BLML.Transpiler.sourcelink.json
+D:\code\BLML\src\bin\Debug\net8.0\BLML.Transpiler.deps.json
+D:\code\BLML\src\bin\Debug\net8.0\BLML.Transpiler.dll
+D:\code\BLML\src\bin\Debug\net8.0\BLML.Transpiler.pdb
+D:\code\BLML\src\obj\Debug\net8.0\BLML.Transpiler.dll
+D:\code\BLML\src\obj\Debug\net8.0\refint\BLML.Transpiler.dll
+D:\code\BLML\src\obj\Debug\net8.0\BLML.Transpiler.pdb
+D:\code\BLML\src\obj\Debug\net8.0\ref\BLML.Transpiler.dll

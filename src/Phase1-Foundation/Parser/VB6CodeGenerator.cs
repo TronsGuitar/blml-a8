@@ -63,18 +63,21 @@ namespace BLML.Phase1Foundation.Parser
         {
             var usings = new List<UsingDirectiveSyntax>
             {
-                SyntaxFactory.UsingDirective(
-                    SyntaxFactory.ParseName("System")
-                )
+                SyntaxFactory.UsingDirective(SyntaxFactory.ParseName("System"))
             };
 
             var members = new List<MemberDeclarationSyntax>();
-            foreach (var child in node.Children)
+            
+            // In C#, we usually wrap logic in a class
+            var classDecl = SyntaxFactory.ClassDeclaration(module.Name)
+                .AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword), SyntaxFactory.Token(SyntaxKind.PartialKeyword));
+
+            foreach (var decl in module.Declarations)
             {
-                var member = GenerateMember(child);
+                var member = GenerateMember(decl);
                 if (member != null)
                 {
-                    members.Add(member);
+                    classDecl = classDecl.AddMembers(member);
                 }
             }
 
@@ -482,88 +485,130 @@ namespace BLML.Phase1Foundation.Parser
 =======
         private MemberDeclarationSyntax GenerateMember(VB6SyntaxNode node)
         {
-            switch (node.Type)
+            return node switch
             {
-                case NodeType.Class:
-                    return GenerateClass(node);
-                case NodeType.Function:
-                    return GenerateMethod(node, true);
-                case NodeType.Sub:
-                    return GenerateMethod(node, false);
-                case NodeType.Property:
-                    return GenerateProperty(node);
-                default:
-                    return null;
-            }
-        }
-
-        private string GenerateExpression(VB6SyntaxNode node)
-        {
-            if (node.Type == NodeType.Expression)
-            {
-                if (BuiltInFunctionHandler.IsBuiltInFunction(node.Value))
-                {
-                    var args = node.Children.Select(GenerateExpression).ToArray();
-                    return BuiltInFunctionHandler.GenerateCShrapCall(node.Value, args);
-                }
-                // Handle other expressions...
-                return node.Value;
-            }
-            return node.Value;
-        }
-
-        private ClassDeclarationSyntax GenerateClass(VB6SyntaxNode node)
-        {
-            var members = new List<MemberDeclarationSyntax>();
-            foreach (var child in node.Children)
-            {
-                var member = GenerateMember(child);
-                if (member != null)
-                {
-                    members.Add(member);
-                }
-            }
-
-            return SyntaxFactory.ClassDeclaration(node.Value)
-                .AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword))
-                .AddMembers(members.ToArray());
-        }
-
-        private MethodDeclarationSyntax GenerateMethod(VB6SyntaxNode node, bool isFunction)
-        {
-            var returnType = isFunction ? 
-                ParseVB6Type(node.Attributes["ReturnType"]) : 
-                SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.VoidKeyword));
-
-            var parameters = new List<ParameterSyntax>();
-            foreach (var param in node.Children.Where(c => c.Type == NodeType.Variable))
-            {
-                parameters.Add(SyntaxFactory.Parameter(
-                    SyntaxFactory.Identifier(param.Value))
-                    .WithType(ParseVB6Type(param.Attributes["Type"]))
-                );
-            }
-
-            var body = SyntaxFactory.Block();
-            // TODO: Generate method body statements
-
-            return SyntaxFactory.MethodDeclaration(returnType, node.Value)
-                .AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword))
-                .AddParameterListParameters(parameters.ToArray())
-                .WithBody(body);
-        }
-
-        private PropertyDeclarationSyntax GenerateProperty(VB6SyntaxNode node)
-        {
-            var propertyType = ParseVB6Type(node.Attributes["Type"]);
-            
-            var accessors = new List<AccessorDeclarationSyntax>
-            {
-                SyntaxFactory.AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
-                    .WithBody(SyntaxFactory.Block()),
-                SyntaxFactory.AccessorDeclaration(SyntaxKind.SetAccessorDeclaration)
-                    .WithBody(SyntaxFactory.Block())
+                MethodDeclarationNode method => GenerateMethod(method),
+                VariableDeclarationNode variable => GenerateField(variable),
+                _ => null
             };
+        }
+
+        private MethodDeclarationSyntax GenerateMethod(MethodDeclarationNode node)
+        {
+            var returnType = ParseVB6Type(node.ReturnType);
+            
+            var parameters = node.Parameters.Select(p => 
+                SyntaxFactory.Parameter(SyntaxFactory.Identifier(p.Name))
+                    .WithType(ParseVB6Type(p.Type))
+                    .AddModifiers(p.IsByRef ? SyntaxFactory.Token(SyntaxKind.RefKeyword) : default)
+            ).ToArray();
+
+            var bodyStatements = node.Body.Select(GenerateStatement).Where(s => s != null).ToArray();
+            var body = SyntaxFactory.Block(bodyStatements);
+
+            var method = SyntaxFactory.MethodDeclaration(returnType, node.Name)
+                .WithParameterList(SyntaxFactory.ParameterList(SyntaxFactory.SeparatedList(parameters)))
+                .WithBody(body);
+
+            // Add modifiers
+            if (node.Accessibility == VB6Accessibility.Public)
+                method = method.AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword));
+            else if (node.Accessibility == VB6Accessibility.Friend)
+                method = method.AddModifiers(SyntaxFactory.Token(SyntaxKind.InternalKeyword));
+            else
+                method = method.AddModifiers(SyntaxFactory.Token(SyntaxKind.PrivateKeyword));
+
+            if (node.Accessibility == VB6Accessibility.Static)
+                method = method.AddModifiers(SyntaxFactory.Token(SyntaxKind.StaticKeyword));
+
+            return method;
+        }
+
+        private FieldDeclarationSyntax GenerateField(VariableDeclarationNode node)
+        {
+            var variable = SyntaxFactory.VariableDeclaration(ParseVB6Type(node.Type))
+                .AddVariables(SyntaxFactory.VariableDeclarator(SyntaxFactory.Identifier(node.Name)));
+
+            var field = SyntaxFactory.FieldDeclaration(variable);
+
+            if (node.Accessibility == VB6Accessibility.Public)
+                field = field.AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword));
+            else if (node.Accessibility == VB6Accessibility.Friend)
+                field = field.AddModifiers(SyntaxFactory.Token(SyntaxKind.InternalKeyword));
+            else
+                field = field.AddModifiers(SyntaxFactory.Token(SyntaxKind.PrivateKeyword));
+
+            return field;
+        }
+
+        private StatementSyntax GenerateStatement(StatementNode node)
+        {
+            if (node is ExpressionStatementNode exprStmt)
+            {
+                var expr = GenerateExpression(exprStmt.Expression);
+                return SyntaxFactory.ExpressionStatement(expr);
+            }
+            if (node is AssignmentNode assign)
+            {
+                var target = GenerateExpression(assign.Target);
+                var value = GenerateExpression(assign.Value);
+                var kind = SyntaxKind.SimpleAssignmentExpression;
+                return SyntaxFactory.ExpressionStatement(SyntaxFactory.AssignmentExpression(kind, target, value));
+            }
+            if (node is IfStatementNode ifStmt)
+            {
+                var condition = GenerateExpression(ifStmt.Condition);
+                var trueBlock = SyntaxFactory.Block(ifStmt.TrueBlock.Statements.Select(GenerateStatement));
+                var elseClause = ifStmt.ElseBlock != null 
+                    ? SyntaxFactory.ElseClause(SyntaxFactory.Block(ifStmt.ElseBlock.Statements.Select(GenerateStatement))) 
+                    : null;
+                
+                return SyntaxFactory.IfStatement(condition, trueBlock, elseClause);
+            }
+            if (node is VariableDeclarationNode varDecl)
+            {
+                // Local variable declaration
+                var variable = SyntaxFactory.VariableDeclaration(ParseVB6Type(varDecl.Type))
+                    .AddVariables(SyntaxFactory.VariableDeclarator(SyntaxFactory.Identifier(varDecl.Name)));
+                return SyntaxFactory.LocalDeclarationStatement(variable);
+            }
+
+            return SyntaxFactory.EmptyStatement();
+        }
+
+        private ExpressionSyntax GenerateExpression(ExpressionNode node)
+        {
+            if (node is LiteralExpressionNode literal)
+            {
+                if (literal.Value is string s)
+                    return SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, SyntaxFactory.Literal(s));
+                if (literal.Value is int i)
+                    return SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(i));
+                if (literal.Value is double d)
+                    return SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(d));
+                return SyntaxFactory.LiteralExpression(SyntaxKind.NullLiteralExpression);
+            }
+            if (node is IdentifierExpressionNode ident)
+            {
+                return SyntaxFactory.IdentifierName(ident.Name);
+            }
+            if (node is BinaryExpressionNode binary)
+            {
+                var kind = binary.Operator switch
+                {
+                    "+" => SyntaxKind.AddExpression,
+                    "-" => SyntaxKind.SubtractExpression,
+                    "*" => SyntaxKind.MultiplyExpression,
+                    "/" => SyntaxKind.DivideExpression,
+                    "&" => SyntaxKind.AddExpression, // Concatenation
+                    "=" => SyntaxKind.EqualsExpression,
+                    "<>" => SyntaxKind.NotEqualsExpression,
+                    "<" => SyntaxKind.LessThanExpression,
+                    ">" => SyntaxKind.GreaterThanExpression,
+                    "<=" => SyntaxKind.LessThanOrEqualExpression,
+                    ">=" => SyntaxKind.GreaterThanOrEqualExpression,
+                    _ => SyntaxKind.None
+                };
 
             return SyntaxFactory.PropertyDeclaration(propertyType, node.Value)
                 .AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword))
