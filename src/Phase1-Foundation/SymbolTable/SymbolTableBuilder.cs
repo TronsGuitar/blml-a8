@@ -109,6 +109,8 @@ namespace BLML.Phase1Foundation.SymbolTable
 
         private void TraverseForSymbols(VB6SyntaxNode node)
         {
+            if (node == null) return;
+
             switch (node.Type)
             {
                 case NodeType.Variable:
@@ -119,22 +121,43 @@ namespace BLML.Phase1Foundation.SymbolTable
                     break;
             }
 
-            foreach (var child in node.Children)
+            // Handle specific declarations
+            if (node.Type == NodeType.Variable && node.Attributes.ContainsKey("WithEvents"))
             {
-                TraverseForSymbols(child);
+                HandleWithEvents(node);
+            }
+
+            if (node.Children != null)
+            {
+                foreach (var child in node.Children)
+                {
+                    TraverseForSymbols(child);
+                }
             }
         }
 
         public void HandleWithEvents(VB6SyntaxNode node)
         {
             // Transform VB6 WithEvents to C# event handling infrastructure
-            // This will be expanded in the next continuation
+            // Mark the node as an event source
+            if (node.Attributes != null)
+            {
+                node.Attributes["IsEventSource"] = "true";
+             
+                // Logic to register event handlers will be handled by the TypeInference or Translation phase, 
+                // checking against this flag or looking up the type's events.
+            }
         }
 
         public void HandleDefaultProperties(VB6SyntaxNode node)
         {
             // Handle VB6 default properties
-            // This will be expanded in the next continuation
+            // This is primarily for usage analysis.
+            // If the node is an identifier used in an expression, we need to check if it refers to a variable
+            // that is an object with a default property.
+            
+            // This logic requires type information which might not be fully available during symbol table construction.
+            // However, we can tag variables that we know are controls/objects.
         }
     }
 }
