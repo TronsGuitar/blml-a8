@@ -30,6 +30,7 @@ namespace BLML.Phase1Foundation.Lexer
 
     public class VB6Lexer
     {
+<<<<<<< HEAD
         // Note: VB6 built-in functions (Len, Mid, Left, Right, Trim, etc.) are NOT included here
         // because they are functions, not keywords. They should be treated as identifiers.
         private readonly HashSet<string> reservedKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -45,6 +46,21 @@ namespace BLML.Phase1Foundation.Lexer
             "Step", "Stop", "Sub", "Then", "To", "True", "Type",
             "Unload", "Until", "Variant", "Wend", "While", "With", "WithEvents",
             "Xor", "Eqv", "Imp"
+=======
+        private readonly HashSet<string> reservedKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "And", "As", "Beep", "Binary", "ByRef", "ByVal", "Call", "Case", "Close",
+            "Const", "Date", "Declare", "Dim", "Do", "Each", "Else", "ElseIf", "End",
+            "Enum", "Erase", "Error", "Event", "Exit", "False", "For", "Friend",
+            "Function", "Get", "GoSub", "GoTo", "If", "Implements", "In", "Input",
+            "Is", "Kill", "Len", "Let", "Like", "Lock", "Loop", "Me", "Mod", "New",
+            "Next", "Not", "Nothing", "Null", "On", "Option", "Optional", "Or",
+            "ParamArray", "Print", "Private", "Property", "Public", "RaiseEvent",
+            "ReDim", "REM", "Resume", "Return", "Seek", "Select", "Set", "Static",
+            "Step", "Stop", "String", "Sub", "Then", "Time", "To", "True", "Type",
+            "Unload", "Until", "Variant", "Wend", "While", "With", "WithEvents",
+            "Write", "Xor", "Eqv", "Imp"
+>>>>>>> 2e0740d (The prototype files)
         };
 
         private readonly HashSet<string> predefinedConstants = new HashSet<string>(SymbolTableBuilder.PredefinedConstants.Keys, StringComparer.OrdinalIgnoreCase);

@@ -11,6 +11,7 @@ namespace BLML.Phase1Foundation.ProjectModel
          * 4. Identify the Startup Object (Sub Main or Form).
          * 5. Map conditional compilation constants and project settings.
          */
+<<<<<<< HEAD
         public VB6Project Parse(string filePath)
         {
             if (!System.IO.File.Exists(filePath))
@@ -115,6 +116,10 @@ namespace BLML.Phase1Foundation.ProjectModel
                 }
             }
             return objRef;
+=======
+        public ProjectFileParser()
+        {
+>>>>>>> 2e0740d (The prototype files)
         }
     }
 }
