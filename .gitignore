@@ -23,5 +23,13 @@ build/
 .env
 .env.local
 .env.*.local
+<<<<<<< HEAD
 
 .fake
+=======
+<<<<<<< HEAD
+
+.fake
+=======
+>>>>>>> 4d75b0b (Initialize project structure and sanitize PII)
+>>>>>>> main
