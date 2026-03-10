@@ -1,5 +1,11 @@
 # Phase6 Advanced Features
 
+## Status
+
+- **Current status:** first implementation slice is active
+- **Validated state:** property procedure conversion and optional/default parameter emission are covered by executable tests
+- **Known gap:** the broader advanced-feature pipeline remains incomplete beyond the property/parameter slice
+
 ## Current Phase6 surface area
 
 The current `Phase6-AdvancedFeatures` folder now contains one active implementation helper:
@@ -24,7 +30,7 @@ The Phase6 work added in this pass is:
 - a dedicated `src/Phase6-AdvancedFeatures` folder
 - a Phase6 status README describing current prerequisites and gaps
 - repository tests that lock in the current analysis of existing Phase6 building blocks
-- a Phase6 DONE/status document under `docs/Phase6-AdvancedFeatures-TODO.md`
+- a completed Phase6 status document under `docs/Phase6-AdvancedFeatures-TODO.md`
 
 ## Existing prerequisites already present in the repository
 

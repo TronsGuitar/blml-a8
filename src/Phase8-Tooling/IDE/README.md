@@ -1,5 +1,11 @@
 # Phase8 Tooling - IDE
 
+## Status
+
+- **Current status:** prototype only
+- **Validated state:** this folder contains an early language-server prototype and starter configuration files
+- **Known gap:** the IDE tooling is not yet a dedicated project and is not part of the active compiled solution
+
 ## Purpose
 
 This folder should become the IDE integration surface for BLML.

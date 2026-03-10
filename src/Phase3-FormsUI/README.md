@@ -1,6 +1,12 @@
 # Phase3 Forms UI
 
-This file tracks the current `Phase3` implementation status after the recent DONE work.
+## Status
+
+- **Current status:** partially implemented and actively tested
+- **Validated state:** form parsing, control generation, layout conversion helpers, and resource extraction have executable coverage in `BLML.Tests`
+- **Known gap:** `vb6binary.cs` remains intentionally isolated and is not part of the active build
+
+This file tracks the current `Phase3` implementation status.
 
 ## Implemented in the current Phase3 pass
 

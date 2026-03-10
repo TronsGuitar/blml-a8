@@ -1,5 +1,11 @@
 # Phase4 Data Access
 
+## Status
+
+- **Current status:** partially implemented
+- **Validated state:** `DbContextGenerator.cs` has executable coverage and the current Phase4 README status is covered by tests
+- **Known gap:** `EntityGenerator.cs`, `SchemaGenerator.cs`, `DataMigration.cs`, and `AdoConverter.cs` are still placeholder-level
+
 ## Current Phase4 surface area
 
 The current `Phase4-DataAccess` folder contains the following active or partially active utilities:

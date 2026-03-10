@@ -1,5 +1,11 @@
 # Phase5 ASP to Angular
 
+## Status
+
+- **Current status:** prototype-only and documentation-backed
+- **Validated state:** repository tests verify current script/template inventory and README/status coverage
+- **Known gap:** there is still no active ASP migration pipeline, Angular project, or executable web-generation flow
+
 ## Current Phase5 surface area
 
 The current `Phase5-ASPtoAngular` folder contains prototype assets under `RazorPages`:

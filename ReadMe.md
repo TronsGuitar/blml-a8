@@ -8,7 +8,13 @@ A comprehensive toolkit for converting Visual Basic 6 applications to modern C# 
 
 This is an **in-progress** conversion framework. See [ProjectPlan.md](ProjectPlan.md) for detailed roadmap and priorities.
 
-**Current Phase:** Foundation (Phase 1) - Core parsing and infrastructure
+**Current validated status:**
+
+- the solution builds successfully on `.NET 8`
+- `tests/BLML.Tests` currently passes `48/49` tests
+- `1` test is intentionally skipped for the isolated `vb6binary.cs` compatibility path
+- active partial implementation currently spans `Phase1`, `Phase3`, `Phase4`, `Phase6`, and `Phase7`
+- `Phase5` and most of `Phase8` remain prototype or planning surfaces rather than finished projects
 
 ---
 
@@ -111,15 +117,17 @@ Convert Microsoft Access applications to web-based solutions.
 - Basic VB6 lexical analysis
 - Partial VB6 parser
 - Form (.frm) file parsing
-- Basic code generation (CodeDom)
+- Roslyn-based C# code generation for the active transpiler path
 - Access database extraction
 - Some control mapping
+- Phase6 property procedure conversion and optional/default parameter emission
+- Phase7 XML documentation, dead-code cleanup, and LINQ suggestion helpers
 
 ### 🚧 In Progress
-- Complete VB6 grammar parser
+- Complete VB6 grammar and semantic coverage
 - Symbol table and type inference
 - AST builder
-- Roslyn-based code generation
+- richer form, data, and advanced-feature conversion coverage
 
 ### 📝 Planned
 - ASP parser
@@ -136,14 +144,14 @@ See [ProjectPlan.md](ProjectPlan.md) for detailed breakdown.
 
 | Phase | Status | Priority | Timeline |
 |-------|--------|----------|----------|
-| **Phase 1:** Foundation | 🟡 In Progress | CRITICAL | Weeks 1-4 |
-| **Phase 2:** Core Language | 🔴 Not Started | HIGH | Weeks 5-8 |
-| **Phase 3:** Forms & UI | 🔴 Not Started | HIGH | Weeks 9-12 |
-| **Phase 4:** Data Access | 🔴 Not Started | HIGH | Weeks 9-12 |
-| **Phase 5:** ASP to Angular | 🔴 Not Started | HIGH | Weeks 13-20 |
-| **Phase 6:** Advanced Features | 🔴 Not Started | MEDIUM | Weeks 21-24 |
-| **Phase 7:** Optimization | 🔴 Not Started | MEDIUM | Weeks 25-26 |
-| **Phase 8:** Tooling | 🔴 Not Started | LOW | Ongoing |
+| **Phase 1:** Foundation | 🟡 Active and partially implemented | CRITICAL | Weeks 1-4 |
+| **Phase 2:** Core Language | 🔴 Incomplete / not fully documented in current pass | HIGH | Weeks 5-8 |
+| **Phase 3:** Forms & UI | 🟡 Partially implemented and tested | HIGH | Weeks 9-12 |
+| **Phase 4:** Data Access | 🟡 Partially implemented | HIGH | Weeks 9-12 |
+| **Phase 5:** ASP to Angular | 🟠 Prototype-only assets | HIGH | Weeks 13-20 |
+| **Phase 6:** Advanced Features | 🟡 First implementation slice active | MEDIUM | Weeks 21-24 |
+| **Phase 7:** Optimization | 🟡 Multiple helper slices active | MEDIUM | Weeks 25-26 |
+| **Phase 8:** Tooling | 🟠 Documentation, stubs, and prototypes | LOW | Ongoing |
 
 ---
 
@@ -185,43 +193,25 @@ dotnet test tests/Integration/
 dotnet test
 ```
 
-### Current failing test status
+### Current test status
 
-The current `tests/BLML.Tests/TranspilerTests.cs` suite is failing.
+The current `tests/BLML.Tests` project is in a healthy state.
 
-- `11/11` tests currently fail.
-- Most parser failures come from unimplemented methods in `src/Phase1-Foundation/Parser/VB6Parser.cs`.
-- `TranspileFile()` catches those exceptions and records `Transpilation failed: The method or operation is not implemented.`, which leaves `CSharpCode` null and causes the parser assertions to fail.
+- `48/49` tests pass
+- `1` test is intentionally skipped
+- the solution builds successfully
+- the parser and transpiler tests called out earlier are now passing
 
-#### Confirmed causes
+#### Remaining known test gap
 
-- `ParseProperty()` is not implemented.
-- `ParseVariableDeclaration(bool)` is not implemented.
-- `ParseVariableDeclaration()` is not implemented.
-- `ParseReDimStatement()` is not implemented.
-- `ParseExpression()` is not implemented.
+- `Phase3FormsUiTodoTests.Vb6BinaryCompatibilityLayer_ShouldSupportBinaryRecordAccessInDedicatedCompatibilityProject` is still skipped
+- that skip is intentional because `src/Phase3-FormsUI/FormParsing/vb6binary.cs` remains isolated until a dedicated compatibility project restores its VB runtime dependencies
 
-These gaps explain the failures for:
+### Next test-focused follow-up
 
-- basic sub parsing
-- `If` statements
-- `For` loops
-- `While/Wend`
-- `Do/Loop`
-- `Select Case`
-- built-in functions
-- predefined constants
-
-The lexer test also fails, but the failure output already shows the expected tokens in the returned collection. That one needs separate investigation.
-
-### TODO
-
-- Implement `ParseExpression()` in `VB6Parser`.
-- Implement both `ParseVariableDeclaration` overloads in `VB6Parser`.
-- Implement `ParseProperty()` in `VB6Parser`.
-- Implement `ParseReDimStatement()` in `VB6Parser`.
-- Re-run `BLML.Tests` after parser work is complete.
-- Isolate `Lexer_ShouldTokenizeSimpleExpression` to determine whether the failure is in tokenization or the assertion path.
+- create the dedicated compatibility project for `vb6binary.cs` if binary VB6 record access is still required
+- add broader fixture-based coverage for end-to-end conversion scenarios across phases
+- keep README status synchronized with the actual build and test state
 
 ---
 
@@ -311,12 +301,14 @@ git push origin feature/my-feature
 - **Scripts:** ~10 PS1/PY/SQL files
 
 ### Completion Status
-- **Foundation:** ~40%
-- **Core Features:** ~20%
-- **Forms:** ~30%
-- **Data Access:** ~25%
-- **ASP Migration:** ~5%
-- **Advanced:** ~10%
+- **Foundation:** active and partially implemented
+- **Core Features:** still incomplete
+- **Forms:** partially implemented with test coverage
+- **Data Access:** partially implemented
+- **ASP Migration:** prototype stage
+- **Advanced:** first slice implemented
+- **Optimization:** active helper slice implemented
+- **Tooling:** planning and stub stage
 
 ---
 
@@ -341,17 +333,15 @@ git push origin feature/my-feature
 
 ## ✅ Final TODO List
 
-1. complete the remaining `Phase1-Foundation` parser work, especially `ParseExpression()`, `ParseVariableDeclaration(...)`, `ParseProperty()`, and `ParseReDimStatement()`
-2. get `tests/BLML.Tests` passing again and isolate the lexer assertion issue
-3. finish `Phase2-CoreLanguage` code-generation and conversion coverage beyond the current partial pipeline
-4. expand `Phase3-FormsUI` form conversion, layout reconstruction, property mapping, and resource conversion
-5. implement the remaining `Phase4-DataAccess` migration pipeline for schema extraction, entity generation, data migration, and ADO modernization
-6. decide and execute the real `Phase5-ASPtoAngular` target architecture, then replace the current prototypes with an actual migration pipeline
-7. extend `Phase6-AdvancedFeatures` into `ParamArray`, named arguments, enums, collections, COM interop, and broader advanced control support
-8. broaden `Phase7-Optimization` into whole-project analysis, migration reporting, code metrics, and safer rewrite support
-9. turn the `Phase8-Tooling` folders into actual projects for CLI, IDE/LSP, VS Code, and web-hosted tooling
-10. add broader fixture-based tests, sample projects, and end-to-end validation across all phases
-11. finish repository polish items such as project packaging, CI coverage, and the top-level license declaration
+1. finish `Phase2-CoreLanguage` code-generation and conversion coverage beyond the current partial pipeline
+2. expand `Phase3-FormsUI` form conversion, layout reconstruction, property mapping, resource conversion, and compatibility-project handling for `vb6binary.cs`
+3. implement the remaining `Phase4-DataAccess` migration pipeline for schema extraction, entity generation, data migration, and ADO modernization
+4. decide and execute the real `Phase5-ASPtoAngular` target architecture, then replace the current prototypes with an actual migration pipeline
+5. extend `Phase6-AdvancedFeatures` into `ParamArray`, named arguments, enums, collections, COM interop, and broader advanced control support
+6. broaden `Phase7-Optimization` into whole-project analysis, migration reporting, code metrics, and safer rewrite support
+7. turn the `Phase8-Tooling` folders into actual projects for CLI, IDE/LSP, VS Code, and web-hosted tooling
+8. add broader fixture-based tests, sample projects, and end-to-end validation across all phases
+9. finish repository polish items such as project packaging, CI coverage, and the top-level license declaration
 
 ---
 

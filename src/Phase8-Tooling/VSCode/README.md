@@ -1,5 +1,11 @@
 # Phase8 Tooling - VSCode
 
+## Status
+
+- **Current status:** grammar-only prototype asset
+- **Validated state:** the folder currently contains a starter `VB6.tmLanguage` grammar file
+- **Known gap:** there is no VS Code extension project, activation code, or language-server integration yet
+
 ## Purpose
 
 This folder should become the Visual Studio Code packaging layer for BLML editor support.

@@ -1,5 +1,11 @@
 # Phase7 Optimization
 
+## Status
+
+- **Current status:** multiple helper slices are active
+- **Validated state:** XML documentation generation, dead-code cleanup analysis, and LINQ suggestion helpers are covered by executable tests
+- **Known gap:** optimization remains file- or request-scoped rather than whole-project and rewrite-capable
+
 ## Current Phase7 surface area
 
 The current `Phase7-Optimization` folder contains three tracked components:
@@ -51,7 +57,7 @@ Added executable tests for:
 - template-based documentation overrides
 - dead-code analysis and cleanup of commented-out conversion remnants
 - loop-to-LINQ suggestion generation for count, sum, and projection patterns
-- Phase7 README and DONE/status coverage
+- Phase7 README and status-document coverage
 
 ## Existing prerequisites already present in the repository
 

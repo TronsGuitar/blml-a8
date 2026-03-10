@@ -1,5 +1,11 @@
 # Phase8 Tooling - CLI
 
+## Status
+
+- **Current status:** compile-safe placeholder and sample entry point
+- **Validated state:** the current CLI files compile as part of the active `.NET 8` solution after stub helpers were added for the sample program
+- **Known gap:** there is still no dedicated CLI project, command parser, or user-facing command surface
+
 ## Purpose
 
 This folder should become the command-line entry point for the BLML toolchain.

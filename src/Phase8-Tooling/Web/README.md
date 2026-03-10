@@ -1,5 +1,11 @@
 # Phase8 Tooling - Web
 
+## Status
+
+- **Current status:** placeholder implementation only
+- **Validated state:** `WebConverter.cs` is present and the placeholder tooling file compiles as part of the active `.NET 8` solution
+- **Known gap:** there is no ASP.NET Core host, UI, background job system, or artifact delivery pipeline yet
+
 ## Purpose
 
 This folder should become the web-hosted tooling surface for BLML.
