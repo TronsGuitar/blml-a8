@@ -26,6 +26,8 @@ namespace BLML.Phase1Foundation.Parser
             
             try
             {
+                currentTokenIndex = 0;
+
                 // Lexical analysis
                 var lexer = new VB6Lexer();
                 tokens = lexer.Tokenize(vb6Code);
@@ -83,7 +85,9 @@ namespace BLML.Phase1Foundation.Parser
         private VB6SyntaxNode ParseDeclaration()
         {
             var token = PeekToken();
+#pragma warning disable CS8603 // Possible null reference return.
             if (token == null) return null;
+#pragma warning restore CS8603 // Possible null reference return.
 
             switch (token.Value.ToLowerInvariant())
             {
@@ -99,16 +103,60 @@ namespace BLML.Phase1Foundation.Parser
                 case "private":
                 case "public":
                 case "friend":
+                case "static":
+                    var accessibility = token.Value;
+                    var nextToken = PeekToken(1);
+                    if (nextToken != null)
+                    {
+                        switch (nextToken.Value.ToLowerInvariant())
+                        {
+                            case "function":
+                                SkipToken();
+                                return ParseFunction(accessibility);
+                            case "sub":
+                                SkipToken();
+                                return ParseSub(accessibility);
+                            case "property":
+                                SkipToken();
+                                return ParseProperty(accessibility);
+                        }
+                    }
                     return ParseVariableDeclaration();
                 default:
                     SkipToken();
+#pragma warning disable CS8603 // Possible null reference return.
                     return null;
+#pragma warning restore CS8603 // Possible null reference return.
             }
         }
 
-        private VB6SyntaxNode ParseProperty()
+        private VB6SyntaxNode ParseProperty(string? accessibility = null)
         {
-            throw new NotImplementedException();
+            SkipToken(); // Skip 'Property'
+
+            var propertyKind = GetToken()?.Value ?? "Get";
+            var name = GetToken()?.Value ?? "UnknownProperty";
+            var propertyNode = new VB6SyntaxNode
+            {
+                Type = NodeType.Property,
+                Value = name
+            };
+
+            propertyNode.Attributes["PropertyKind"] = propertyKind;
+
+            if (!string.IsNullOrWhiteSpace(accessibility))
+            {
+                propertyNode.Attributes["Accessibility"] = accessibility;
+            }
+
+            ParseParameters(propertyNode);
+            if (Match("As"))
+            {
+                propertyNode.Attributes["ReturnType"] = GetToken()?.Value ?? "Variant";
+            }
+
+            ParseMethodBody(propertyNode, "Property");
+            return propertyNode;
         }
 
         private VB6SyntaxNode ParseClass()
@@ -118,11 +166,16 @@ namespace BLML.Phase1Foundation.Parser
             return new VB6SyntaxNode { Type = NodeType.Class, Value = name };
         }
 
-        private VB6SyntaxNode ParseFunction()
+        private VB6SyntaxNode ParseFunction(string? accessibility = null)
         {
             SkipToken(); // Skip 'Function'
             var name = GetToken()?.Value ?? "UnknownFunction";
             var funcNode = new VB6SyntaxNode { Type = NodeType.Function, Value = name };
+
+            if (!string.IsNullOrWhiteSpace(accessibility))
+            {
+                funcNode.Attributes["Accessibility"] = accessibility;
+            }
             
             ParseParameters(funcNode);
             if (Match("As"))
@@ -134,11 +187,16 @@ namespace BLML.Phase1Foundation.Parser
             return funcNode;
         }
 
-        private VB6SyntaxNode ParseSub()
+        private VB6SyntaxNode ParseSub(string? accessibility = null)
         {
             SkipToken(); // Skip 'Sub'
             var name = GetToken()?.Value ?? "UnknownSub";
             var subNode = new VB6SyntaxNode { Type = NodeType.Sub, Value = name };
+
+            if (!string.IsNullOrWhiteSpace(accessibility))
+            {
+                subNode.Attributes["Accessibility"] = accessibility;
+            }
 
             ParseParameters(subNode);
             ParseMethodBody(subNode, "Sub");
@@ -161,7 +219,96 @@ namespace BLML.Phase1Foundation.Parser
 
         private VB6SyntaxNode ParseVariableDeclaration(bool v)
         {
-            throw new NotImplementedException();
+            var variableNode = new VB6SyntaxNode
+            {
+                Type = NodeType.Variable
+            };
+
+            if (v)
+            {
+                if (Match("Optional"))
+                {
+                    variableNode.Attributes["Optional"] = "true";
+                }
+
+                if (Match("ByVal"))
+                {
+                    variableNode.Attributes["ByVal"] = "true";
+                }
+                else if (Match("ByRef"))
+                {
+                    variableNode.Attributes["ByVal"] = "false";
+                }
+
+                variableNode.Attributes["IsParameter"] = "true";
+            }
+            else
+            {
+                var declarationKeyword = PeekToken()?.Value;
+                if (declarationKeyword != null)
+                {
+                    switch (declarationKeyword.ToLowerInvariant())
+                    {
+                        case "public":
+                        case "private":
+                        case "friend":
+                        case "static":
+                            variableNode.Attributes["Accessibility"] = declarationKeyword;
+                            SkipToken();
+                            if (PeekToken()?.Value.Equals("Dim", StringComparison.OrdinalIgnoreCase) == true)
+                            {
+                                SkipToken();
+                            }
+                            break;
+                        case "dim":
+                            SkipToken();
+                            break;
+                    }
+                }
+            }
+
+            variableNode.Value = GetToken()?.Value ?? "UnnamedVariable";
+            variableNode.Attributes.TryAdd("Type", "Variant");
+
+            if (Match("("))
+            {
+                variableNode.Attributes["IsArray"] = "true";
+                while (PeekToken() != null && !Match(")"))
+                {
+                    var dimension = ParseExpression();
+                    if (dimension != null)
+                    {
+                        variableNode.Children.Add(dimension);
+                    }
+
+                    Match(",");
+                }
+            }
+
+            if (Match("As"))
+            {
+                variableNode.Attributes["Type"] = GetToken()?.Value ?? "Variant";
+            }
+
+            if (Match("="))
+            {
+                var initialValue = ParseExpression();
+                if (initialValue != null)
+                {
+                    if (v)
+                    {
+                        variableNode.Attributes["DefaultValue"] = initialValue.Value;
+                    }
+                    else
+                    {
+                        variableNode.Attributes["InitialValue"] = initialValue.Value;
+                    }
+
+                    variableNode.Children.Add(initialValue);
+                }
+            }
+
+            return variableNode;
         }
 
         private void ParseMethodBody(VB6SyntaxNode methodNode, string endKeyword)
@@ -187,7 +334,9 @@ namespace BLML.Phase1Foundation.Parser
         private VB6SyntaxNode ParseStatement()
         {
             var token = PeekToken();
+#pragma warning disable CS8603 // Possible null reference return.
             if (token == null) return null;
+#pragma warning restore CS8603 // Possible null reference return.
 
             switch (token.Value.ToLowerInvariant())
             {
@@ -212,7 +361,7 @@ namespace BLML.Phase1Foundation.Parser
                     return ParseReDimStatement();
                 default:
                     // If it's an identifier followed by an equal sign, it's an assignment
-                    if (token.Type == TokenType.Identifier)
+                    if (token.Type == BLML.Phase1Foundation.Lexer.TokenType.Identifier)
                     {
                         var next = tokens.ElementAtOrDefault(currentTokenIndex + 1);
                         if (next != null && next.Value == "=")
@@ -227,18 +376,49 @@ namespace BLML.Phase1Foundation.Parser
                         return new VB6SyntaxNode { Type = NodeType.Statement, Value = "Expression", Children = { expr } };
                     }
                     SkipToken();
+#pragma warning disable CS8603 // Possible null reference return.
                     return null;
+#pragma warning restore CS8603 // Possible null reference return.
             }
         }
 
         private VB6SyntaxNode ParseReDimStatement()
         {
-            throw new NotImplementedException();
+            SkipToken(); // Skip 'ReDim'
+
+            var redimNode = new VB6SyntaxNode
+            {
+                Type = NodeType.Statement,
+                Value = "ReDim"
+            };
+
+            if (Match("Preserve"))
+            {
+                redimNode.Attributes["Preserve"] = "True";
+            }
+
+            redimNode.Attributes["VariableName"] = GetToken()?.Value ?? string.Empty;
+
+            if (Match("("))
+            {
+                while (PeekToken() != null && !Match(")"))
+                {
+                    var dimension = ParseExpression();
+                    if (dimension != null)
+                    {
+                        redimNode.Children.Add(dimension);
+                    }
+
+                    Match(",");
+                }
+            }
+
+            return redimNode;
         }
 
         private VB6SyntaxNode ParseVariableDeclaration()
         {
-            throw new NotImplementedException();
+            return ParseVariableDeclaration(false);
         }
 
         private VB6SyntaxNode ParseAssignment()
@@ -252,7 +432,9 @@ namespace BLML.Phase1Foundation.Parser
                 if (expr != null) assignNode.Children.Add(expr);
                 return assignNode;
             }
+#pragma warning disable CS8603 // Possible null reference return.
             return null;
+#pragma warning restore CS8603 // Possible null reference return.
         }
 
         private VB6SyntaxNode ParseIfStatement()
@@ -322,7 +504,7 @@ namespace BLML.Phase1Foundation.Parser
             Match("Next");
             // Optionally consume the loop variable after Next
             var nextToken = PeekToken();
-            if (nextToken != null && nextToken.Type == TokenType.Identifier &&
+            if (nextToken != null && nextToken.Type == BLML.Phase1Foundation.Lexer.TokenType.Identifier &&
                 nextToken.Value.Equals(loopVar, StringComparison.OrdinalIgnoreCase))
             {
                 SkipToken();
@@ -511,12 +693,161 @@ namespace BLML.Phase1Foundation.Parser
 
         private VB6SyntaxNode ParseExpression()
         {
-            throw new NotImplementedException();
+            return ParseBinaryExpression(0);
+        }
+
+        private VB6SyntaxNode ParseBinaryExpression(int parentPrecedence)
+        {
+            var left = ParsePrimaryExpression();
+            if (left == null)
+            {
+#pragma warning disable CS8603 // Possible null reference return.
+                return null;
+#pragma warning restore CS8603 // Possible null reference return.
+            }
+
+            while (true)
+            {
+                var operatorToken = PeekToken();
+                var precedence = GetBinaryOperatorPrecedence(operatorToken);
+                if (precedence == 0 || precedence <= parentPrecedence)
+                {
+                    break;
+                }
+
+                SkipToken();
+                var right = ParseBinaryExpression(precedence);
+                if (right == null)
+                {
+                    break;
+                }
+
+                left = new VB6SyntaxNode
+                {
+                    Type = NodeType.Expression,
+                    Value = operatorToken!.Value,
+                    Children = { left, right }
+                };
+            }
+
+            return left;
+        }
+
+        private VB6SyntaxNode ParsePrimaryExpression()
+        {
+            var token = PeekToken();
+            if (token == null)
+            {
+#pragma warning disable CS8603 // Possible null reference return.
+                return null;
+#pragma warning restore CS8603 // Possible null reference return.
+            }
+
+            if (Match("("))
+            {
+                var expression = ParseExpression();
+                Match(")");
+                return expression;
+            }
+
+            if (token.Type == BLML.Phase1Foundation.Lexer.TokenType.NumberLiteral)
+            {
+                SkipToken();
+                return new VB6SyntaxNode
+                {
+                    Type = NodeType.Expression,
+                    Value = token.Value,
+                    Attributes = new Dictionary<string, string>
+                    {
+                        ["LiteralKind"] = "Number"
+                    }
+                };
+            }
+
+            if (token.Type == BLML.Phase1Foundation.Lexer.TokenType.StringLiteral)
+            {
+                SkipToken();
+                return new VB6SyntaxNode
+                {
+                    Type = NodeType.Expression,
+                    Value = token.Value,
+                    Attributes = new Dictionary<string, string>
+                    {
+                        ["LiteralKind"] = "String"
+                    }
+                };
+            }
+
+            if (token.Type == BLML.Phase1Foundation.Lexer.TokenType.Identifier || token.Type == BLML.Phase1Foundation.Lexer.TokenType.Keyword)
+            {
+                SkipToken();
+
+                var expressionNode = new VB6SyntaxNode
+                {
+                    Type = NodeType.Expression,
+                    Value = token.Value
+                };
+
+                if (token.Value.Equals("True", StringComparison.OrdinalIgnoreCase) ||
+                    token.Value.Equals("False", StringComparison.OrdinalIgnoreCase))
+                {
+                    expressionNode.Attributes["LiteralKind"] = "Boolean";
+                }
+
+                if (Match("("))
+                {
+                    expressionNode.Attributes["ExpressionKind"] = "Invocation";
+                    while (PeekToken() != null && !Match(")"))
+                    {
+                        var argument = ParseExpression();
+                        if (argument != null)
+                        {
+                            expressionNode.Children.Add(argument);
+                        }
+
+                        Match(",");
+                    }
+                }
+
+                return expressionNode;
+            }
+
+#pragma warning disable CS8603 // Possible null reference return.
+            return null;
+#pragma warning restore CS8603 // Possible null reference return.
+        }
+
+        private static int GetBinaryOperatorPrecedence(VB6Token? token)
+        {
+            if (token == null)
+            {
+                return 0;
+            }
+
+            return token.Value switch
+            {
+                "*" or "/" or "Mod" => 5,
+                "+" or "-" or "&" => 4,
+                "=" or "<>" or "<" or ">" or "<=" or ">=" => 3,
+                "And" => 2,
+                "Or" => 1,
+                _ => 0
+            };
         }
 
         private VB6Token PeekToken()
         {
+#pragma warning disable CS8603 // Possible null reference return.
             return currentTokenIndex < tokens.Count ? tokens[currentTokenIndex] : null;
+#pragma warning restore CS8603 // Possible null reference return.
+        }
+
+        private VB6Token PeekToken(int offset)
+        {
+#pragma warning disable CS8603 // Possible null reference return.
+            var index = currentTokenIndex + offset;
+            return index < tokens.Count ? tokens[index] : null;
+#pragma warning restore CS8603 // Possible null reference return.
         }
 
         private void SkipToken()
@@ -526,7 +857,9 @@ namespace BLML.Phase1Foundation.Parser
 
         private VB6Token GetToken()
         {
+#pragma warning disable CS8603 // Possible null reference return.
             return currentTokenIndex < tokens.Count ? tokens[currentTokenIndex++] : null;
+#pragma warning restore CS8603 // Possible null reference return.
         }
 
         private bool Match(string value)

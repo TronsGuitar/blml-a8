@@ -1,97 +1,172 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
+using BLML.Phase3FormsUI.Models;
 
-class FrmParser
+namespace BLML.Phase3FormsUI.FormParsing;
+
+public static class FrmParser
 {
-    // Mapping of VB6 controls to C# equivalents
-    private static readonly Dictionary<string, string> Vb6ToCSharpControls = new Dictionary<string, string>
+    private static readonly Dictionary<string, string> Vb6ToCSharpControls = new(StringComparer.OrdinalIgnoreCase)
     {
-        { "VB.CommandButton", "System.Windows.Forms.Button" },
-        { "VB.TextBox", "System.Windows.Forms.TextBox" },
-        { "VB.Label", "System.Windows.Forms.Label" },
-        { "VB.CheckBox", "System.Windows.Forms.CheckBox" },
-        { "VB.OptionButton", "System.Windows.Forms.RadioButton" },
-        { "VB.ListBox", "System.Windows.Forms.ListBox" },
-        { "VB.ComboBox", "System.Windows.Forms.ComboBox" },
-        { "VB.Frame", "System.Windows.Forms.GroupBox" },
-        { "VB.PictureBox", "System.Windows.Forms.PictureBox" },
-        { "VB.HScrollBar", "System.Windows.Forms.HScrollBar" },
-        { "VB.VScrollBar", "System.Windows.Forms.VScrollBar" },
-        { "VB.Timer", "System.Windows.Forms.Timer" }
+        ["VB.CommandButton"] = "System.Windows.Forms.Button",
+        ["VB.TextBox"] = "System.Windows.Forms.TextBox",
+        ["VB.Label"] = "System.Windows.Forms.Label",
+        ["VB.CheckBox"] = "System.Windows.Forms.CheckBox",
+        ["VB.OptionButton"] = "System.Windows.Forms.RadioButton",
+        ["VB.ListBox"] = "System.Windows.Forms.ListBox",
+        ["VB.ComboBox"] = "System.Windows.Forms.ComboBox",
+        ["VB.Frame"] = "System.Windows.Forms.GroupBox",
+        ["VB.PictureBox"] = "System.Windows.Forms.PictureBox",
+        ["VB.HScrollBar"] = "System.Windows.Forms.HScrollBar",
+        ["VB.VScrollBar"] = "System.Windows.Forms.VScrollBar",
+        ["VB.Timer"] = "System.Windows.Forms.Timer"
     };
+
+    private static readonly Regex BeginRegex = new(@"^Begin\s+(?<Type>[\w\.]+)\s+(?<Name>\w+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    public static Vb6FormDefinition ParseFile(string inputFilePath)
+    {
+        return ParseContent(File.ReadAllText(inputFilePath));
+    }
+
+    public static Vb6FormDefinition ParseContent(string vb6FormContent)
+    {
+        var form = new Vb6FormDefinition();
+        var controlStack = new Stack<Vb6ControlDefinition>();
+
+        foreach (var rawLine in SplitLines(vb6FormContent))
+        {
+            var line = rawLine.Trim();
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            var beginMatch = BeginRegex.Match(line);
+            if (beginMatch.Success)
+            {
+                var type = beginMatch.Groups["Type"].Value;
+                var name = beginMatch.Groups["Name"].Value;
+
+                if (type.Equals("VB.Form", StringComparison.OrdinalIgnoreCase))
+                {
+                    form.Name = name;
+                    controlStack.Clear();
+                    continue;
+                }
+
+                var control = new Vb6ControlDefinition
+                {
+                    Type = type,
+                    Name = name
+                };
+
+                if (controlStack.Count == 0)
+                {
+                    form.Controls.Add(control);
+                }
+                else
+                {
+                    controlStack.Peek().Children.Add(control);
+                }
+
+                controlStack.Push(control);
+                continue;
+            }
+
+            if (line.Equals("End", StringComparison.OrdinalIgnoreCase))
+            {
+                if (controlStack.Count > 0)
+                {
+                    controlStack.Pop();
+                }
+
+                continue;
+            }
+
+            var equalsIndex = line.IndexOf('=');
+            if (equalsIndex < 0)
+            {
+                continue;
+            }
+
+            var propertyName = line[..equalsIndex].Trim();
+            var propertyValue = line[(equalsIndex + 1)..].Trim();
+
+            if (controlStack.Count == 0)
+            {
+                form.Properties[propertyName] = propertyValue;
+            }
+            else
+            {
+                controlStack.Peek().Properties[propertyName] = propertyValue;
+            }
+        }
+
+        return form;
+    }
+
+    public static string ConvertToIntermediateFormat(Vb6FormDefinition form)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine($"C# Form: {form.Name}");
+
+        foreach (var formProperty in form.Properties.OrderBy(property => property.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            builder.AppendLine($"FormProperty: {formProperty.Key} = {formProperty.Value}");
+        }
+
+        if (form.Properties.Count > 0 && form.Controls.Count > 0)
+        {
+            builder.AppendLine();
+        }
+
+        foreach (var control in form.Controls)
+        {
+            WriteControl(builder, control, depth: 0);
+        }
+
+        return builder.ToString();
+    }
 
     public static void ParseAndConvertToCSharp(string inputFilePath, string outputFilePath)
     {
-        var controls = new List<ControlData>();
-        ControlData currentControl = null;
-
-        foreach (var line in File.ReadLines(inputFilePath))
-        {
-            var trimmedLine = line.Trim();
-
-            // Identify a new control
-            if (trimmedLine.StartsWith("Begin "))
-            {
-                var match = Regex.Match(trimmedLine, @"Begin\s+(\w+\.\w+)\s+(\w+)");
-                if (match.Success)
-                {
-                    var vb6Type = match.Groups[1].Value;
-                    var controlName = match.Groups[2].Value;
-                    currentControl = new ControlData
-                    {
-                        Type = Vb6ToCSharpControls.ContainsKey(vb6Type) ? Vb6ToCSharpControls[vb6Type] : vb6Type,
-                        Name = controlName
-                    };
-                    controls.Add(currentControl);
-                }
-            }
-            // End of control declaration
-            else if (trimmedLine == "End")
-            {
-                currentControl = null;
-            }
-            // Capture properties
-            else if (currentControl != null && trimmedLine.Contains('='))
-            {
-                var parts = trimmedLine.Split('=');
-                var propName = parts[0].Trim();
-                var propValue = parts[1].Trim();
-                currentControl.Properties[propName] = propValue;
-            }
-        }
-
-        // Generate .frmx file
-        using (var writer = new StreamWriter(outputFilePath))
-        {
-            writer.WriteLine("C# Form");
-            foreach (var control in controls)
-            {
-                writer.WriteLine($"Control: {control.Type} Name: {control.Name}");
-                foreach (var prop in control.Properties)
-                {
-                    writer.WriteLine($"  {prop.Key} = {prop.Value}");
-                }
-                writer.WriteLine();
-            }
-        }
-
-        Console.WriteLine($".frmx file generated at {outputFilePath}");
+        var form = ParseFile(inputFilePath);
+        var converted = ConvertToIntermediateFormat(form);
+        File.WriteAllText(outputFilePath, converted);
     }
 
-    private class ControlData
+    public static string MapToCSharpControlType(string vb6Type)
     {
-        public string Type { get; set; }
-        public string Name { get; set; }
-        public Dictionary<string, string> Properties { get; } = new Dictionary<string, string>();
+        return Vb6ToCSharpControls.TryGetValue(vb6Type, out var csharpType)
+            ? csharpType
+            : vb6Type;
     }
 
-    static void Main(string[] args)
+    private static void WriteControl(StringBuilder builder, Vb6ControlDefinition control, int depth)
     {
-        string inputFilePath = "path_to_your_form.frm";
-        string outputFilePath = "path_to_your_output.frmx";
-        
-        ParseAndConvertToCSharp(inputFilePath, outputFilePath);
+        var indent = new string(' ', depth * 2);
+        builder.AppendLine($"{indent}Control: {MapToCSharpControlType(control.Type)} Name: {control.Name}");
+
+        foreach (var property in control.Properties.OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            builder.AppendLine($"{indent}  {property.Key} = {property.Value}");
+        }
+
+        builder.AppendLine();
+
+        foreach (var child in control.Children)
+        {
+            WriteControl(builder, child, depth + 1);
+        }
+    }
+
+    private static IEnumerable<string> SplitLines(string content)
+    {
+        return content.Split(["\r\n", "\n", "\r"], StringSplitOptions.None);
     }
 }

@@ -5,6 +5,8 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using BLML.Phase1Foundation.AST;
+using BLML.Phase6AdvancedFeatures;
+using BLML.Phase1Foundation.SymbolTable;
 
 namespace BLML.Phase1Foundation.Parser
 {
@@ -37,13 +39,9 @@ namespace BLML.Phase1Foundation.Parser
             var classDecl = SyntaxFactory.ClassDeclaration(module.Name)
                 .AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword), SyntaxFactory.Token(SyntaxKind.PartialKeyword));
 
-            foreach (var decl in module.Declarations)
+            foreach (var member in GenerateMembers(module.Declarations))
             {
-                var member = GenerateMember(decl);
-                if (member != null)
-                {
-                    classDecl = classDecl.AddMembers(member);
-                }
+                classDecl = classDecl.AddMembers(member);
             }
 
             members.Add(classDecl);
@@ -53,25 +51,71 @@ namespace BLML.Phase1Foundation.Parser
                 .AddMembers(members.ToArray());
         }
 
+        private IEnumerable<MemberDeclarationSyntax> GenerateMembers(IReadOnlyList<DeclarationNode> declarations)
+        {
+            var handledPropertyGroups = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (var declaration in declarations)
+            {
+                if (declaration is PropertyDeclarationNode propertyProcedure)
+                {
+                    var groupKey = GetPropertyGroupKey(propertyProcedure);
+                    if (!handledPropertyGroups.Add(groupKey))
+                    {
+                        continue;
+                    }
+
+                    var propertyProcedures = declarations
+                        .OfType<PropertyDeclarationNode>()
+                        .Where(candidate => GetPropertyGroupKey(candidate) == groupKey)
+                        .ToList();
+
+                    var property = PropertyProcedureGenerator.TryGenerateProperty(
+                        propertyProcedures,
+                        ParseVB6Type,
+                        GenerateStatement,
+                        GenerateExpression);
+
+                    if (property is not null)
+                    {
+                        yield return AddAccessibilityModifiers(property, propertyProcedure.Accessibility);
+                    }
+                    else
+                    {
+                        foreach (var procedure in propertyProcedures)
+                        {
+                            yield return GeneratePropertyProcedureFallbackMethod(procedure);
+                        }
+                    }
+
+                    continue;
+                }
+
+                var member = GenerateMember(declaration);
+                if (member != null)
+                {
+                    yield return member;
+                }
+            }
+        }
+
         private MemberDeclarationSyntax GenerateMember(DeclarationNode node)
         {
+#pragma warning disable CS8603 // Possible null reference return.
             return node switch
             {
                 MethodDeclarationNode method => GenerateMethod(method),
                 VariableDeclarationNode variable => GenerateField(variable),
                 _ => null
             };
+#pragma warning restore CS8603 // Possible null reference return.
         }
 
         private MethodDeclarationSyntax GenerateMethod(MethodDeclarationNode node)
         {
             var returnType = ParseVB6Type(node.ReturnType);
             
-            var parameters = node.Parameters.Select(p => 
-                SyntaxFactory.Parameter(SyntaxFactory.Identifier(p.Name))
-                    .WithType(ParseVB6Type(p.Type))
-                    .AddModifiers(p.IsByRef ? SyntaxFactory.Token(SyntaxKind.RefKeyword) : default)
-            ).ToArray();
+            var parameters = node.Parameters.Select(GenerateParameter).ToArray();
 
             var bodyStatements = node.Body.Select(GenerateStatement).Where(s => s != null).ToArray();
             var body = SyntaxFactory.Block(bodyStatements);
@@ -80,18 +124,7 @@ namespace BLML.Phase1Foundation.Parser
                 .WithParameterList(SyntaxFactory.ParameterList(SyntaxFactory.SeparatedList(parameters)))
                 .WithBody(body);
 
-            // Add modifiers
-            if (node.Accessibility == VB6Accessibility.Public)
-                method = method.AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword));
-            else if (node.Accessibility == VB6Accessibility.Friend)
-                method = method.AddModifiers(SyntaxFactory.Token(SyntaxKind.InternalKeyword));
-            else
-                method = method.AddModifiers(SyntaxFactory.Token(SyntaxKind.PrivateKeyword));
-
-            if (node.Accessibility == VB6Accessibility.Static)
-                method = method.AddModifiers(SyntaxFactory.Token(SyntaxKind.StaticKeyword));
-
-            return method;
+            return AddAccessibilityModifiers(method, node.Accessibility);
         }
 
         private FieldDeclarationSyntax GenerateField(VariableDeclarationNode node)
@@ -101,14 +134,129 @@ namespace BLML.Phase1Foundation.Parser
 
             var field = SyntaxFactory.FieldDeclaration(variable);
 
-            if (node.Accessibility == VB6Accessibility.Public)
-                field = field.AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword));
-            else if (node.Accessibility == VB6Accessibility.Friend)
-                field = field.AddModifiers(SyntaxFactory.Token(SyntaxKind.InternalKeyword));
-            else
-                field = field.AddModifiers(SyntaxFactory.Token(SyntaxKind.PrivateKeyword));
+            return AddAccessibilityModifiers(field, node.Accessibility);
+        }
 
-            return field;
+        private MethodDeclarationSyntax GeneratePropertyProcedureFallbackMethod(PropertyDeclarationNode node)
+        {
+            var method = new MethodDeclarationNode
+            {
+                Name = node.Name,
+                Accessibility = node.Accessibility,
+                IsFunction = node.PropertyKind == PropertyProcedureKind.Get,
+                ReturnType = node.PropertyKind == PropertyProcedureKind.Get ? node.Type : "void"
+            };
+
+            foreach (var parameter in node.Parameters)
+            {
+                method.Parameters.Add(parameter);
+            }
+
+            foreach (var statement in node.Body)
+            {
+                method.Body.Add(statement);
+            }
+
+            return GenerateMethod(method);
+        }
+
+        private ParameterSyntax GenerateParameter(ParameterNode parameter)
+        {
+            var generatedParameter = SyntaxFactory.Parameter(SyntaxFactory.Identifier(parameter.Name))
+                .WithType(ParseVB6Type(parameter.Type));
+
+            if (parameter.IsByRef)
+            {
+                generatedParameter = generatedParameter.AddModifiers(SyntaxFactory.Token(SyntaxKind.RefKeyword));
+            }
+
+            if (parameter.IsOptional && !parameter.IsByRef)
+            {
+                var defaultValueExpression = GenerateOptionalDefaultValue(parameter);
+                if (defaultValueExpression != null)
+                {
+                    generatedParameter = generatedParameter.WithDefault(
+                        SyntaxFactory.EqualsValueClause(defaultValueExpression));
+                }
+            }
+
+            return generatedParameter;
+        }
+
+        private ExpressionSyntax? GenerateOptionalDefaultValue(ParameterNode parameter)
+        {
+            if (parameter.DefaultValueExpression != null)
+            {
+                return GenerateExpression(parameter.DefaultValueExpression);
+            }
+
+            if (string.IsNullOrWhiteSpace(parameter.DefaultValue))
+            {
+                return null;
+            }
+
+            if (int.TryParse(parameter.DefaultValue, out var integerValue))
+            {
+                return SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(integerValue));
+            }
+
+            if (double.TryParse(parameter.DefaultValue, out var doubleValue))
+            {
+                return SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(doubleValue));
+            }
+
+            if (bool.TryParse(parameter.DefaultValue, out var boolValue))
+            {
+                return boolValue
+                    ? SyntaxFactory.LiteralExpression(SyntaxKind.TrueLiteralExpression)
+                    : SyntaxFactory.LiteralExpression(SyntaxKind.FalseLiteralExpression);
+            }
+
+            return SyntaxFactory.IdentifierName(parameter.DefaultValue);
+        }
+
+        private MethodDeclarationSyntax AddAccessibilityModifiers(MethodDeclarationSyntax member, VB6Accessibility accessibility)
+        {
+            return accessibility switch
+            {
+                VB6Accessibility.Public => member.AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword)),
+                VB6Accessibility.Friend => member.AddModifiers(SyntaxFactory.Token(SyntaxKind.InternalKeyword)),
+                VB6Accessibility.Static => member.AddModifiers(
+                    SyntaxFactory.Token(SyntaxKind.PrivateKeyword),
+                    SyntaxFactory.Token(SyntaxKind.StaticKeyword)),
+                _ => member.AddModifiers(SyntaxFactory.Token(SyntaxKind.PrivateKeyword))
+            };
+        }
+
+        private FieldDeclarationSyntax AddAccessibilityModifiers(FieldDeclarationSyntax member, VB6Accessibility accessibility)
+        {
+            return accessibility switch
+            {
+                VB6Accessibility.Public => member.AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword)),
+                VB6Accessibility.Friend => member.AddModifiers(SyntaxFactory.Token(SyntaxKind.InternalKeyword)),
+                VB6Accessibility.Static => member.AddModifiers(
+                    SyntaxFactory.Token(SyntaxKind.PrivateKeyword),
+                    SyntaxFactory.Token(SyntaxKind.StaticKeyword)),
+                _ => member.AddModifiers(SyntaxFactory.Token(SyntaxKind.PrivateKeyword))
+            };
+        }
+
+        private PropertyDeclarationSyntax AddAccessibilityModifiers(PropertyDeclarationSyntax member, VB6Accessibility accessibility)
+        {
+            return accessibility switch
+            {
+                VB6Accessibility.Public => member.AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword)),
+                VB6Accessibility.Friend => member.AddModifiers(SyntaxFactory.Token(SyntaxKind.InternalKeyword)),
+                VB6Accessibility.Static => member.AddModifiers(
+                    SyntaxFactory.Token(SyntaxKind.PrivateKeyword),
+                    SyntaxFactory.Token(SyntaxKind.StaticKeyword)),
+                _ => member.AddModifiers(SyntaxFactory.Token(SyntaxKind.PrivateKeyword))
+            };
+        }
+
+        private static string GetPropertyGroupKey(PropertyDeclarationNode propertyDeclaration)
+        {
+            return $"{propertyDeclaration.Accessibility}:{propertyDeclaration.Name}";
         }
 
         private StatementSyntax GenerateStatement(StatementNode node)
@@ -398,14 +546,23 @@ namespace BLML.Phase1Foundation.Parser
             {
                 if (literal.Value is string s)
                     return SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, SyntaxFactory.Literal(s));
+                if (literal.Value is char c)
+                    return SyntaxFactory.LiteralExpression(SyntaxKind.CharacterLiteralExpression, SyntaxFactory.Literal(c));
                 if (literal.Value is int i)
                     return SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(i));
                 if (literal.Value is double d)
                     return SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(d));
+                if (literal.Value is bool b)
+                    return b ? SyntaxFactory.LiteralExpression(SyntaxKind.TrueLiteralExpression) : SyntaxFactory.LiteralExpression(SyntaxKind.FalseLiteralExpression);
                 return SyntaxFactory.LiteralExpression(SyntaxKind.NullLiteralExpression);
             }
             if (node is IdentifierExpressionNode ident)
             {
+                if (SymbolTableBuilder.PredefinedConstants.TryGetValue(ident.Name, out var constantValue))
+                {
+                    return GenerateExpression(new LiteralExpressionNode { Value = constantValue! });
+                }
+
                 return SyntaxFactory.IdentifierName(ident.Name);
             }
             if (node is BinaryExpressionNode binary)
@@ -432,6 +589,12 @@ namespace BLML.Phase1Foundation.Parser
             }
             if (node is InvocationExpressionNode invoke)
             {
+                if (invoke.Target is IdentifierExpressionNode targetIdentifier && BuiltInFunctionHandler.IsBuiltInFunction(targetIdentifier.Name))
+                {
+                    var generatedArguments = invoke.Arguments.Select(a => GenerateExpression(a).ToString()).ToArray();
+                    return SyntaxFactory.ParseExpression(BuiltInFunctionHandler.GenerateCShrapCall(targetIdentifier.Name, generatedArguments));
+                }
+
                 var args = invoke.Arguments.Select(a => SyntaxFactory.Argument(GenerateExpression(a))).ToArray();
                 return SyntaxFactory.InvocationExpression(GenerateExpression(invoke.Target))
                     .WithArgumentList(SyntaxFactory.ArgumentList(SyntaxFactory.SeparatedList(args)));

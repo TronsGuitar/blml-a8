@@ -93,15 +93,70 @@ namespace BLML.Phase1Foundation.DependencyGraph
 
         public List<string> Metadata_GetTopologicalSort(Dictionary<string, DependencyNode> graph)
         {
-            // Placeholder for topological sort to determine compilation order
-            // This naively returns the list as is for now
-            return graph.Keys.ToList();
+            // Topological sort using Kahn's algorithm
+            var sorted = new List<string>();
+            var inDegree = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var node in graph.Values)
+            {
+                inDegree[node.Name] = 0;
+            }
+            foreach (var node in graph.Values)
+            {
+                foreach (var dep in node.DependsOn)
+                {
+                    if (inDegree.ContainsKey(dep))
+                        inDegree[dep]++;
+                }
+            }
+            var queue = new Queue<string>(inDegree.Where(kv => kv.Value == 0).Select(kv => kv.Key));
+            while (queue.Count > 0)
+            {
+                var name = queue.Dequeue();
+                sorted.Add(name);
+                foreach (var dep in graph[name].DependsOn)
+                {
+                    if (inDegree.ContainsKey(dep))
+                    {
+                        inDegree[dep]--;
+                        if (inDegree[dep] == 0)
+                            queue.Enqueue(dep);
+                    }
+                }
+            }
+            // If not all nodes are sorted, there is a cycle
+            if (sorted.Count != graph.Count)
+                return new List<string>(); // Cycle detected
+            return sorted;
         }
 
         public List<string> DetectCircularDependencies(Dictionary<string, DependencyNode> graph)
         {
-            // Placeholder for circular dependency detection
-            return new List<string>();
+            // Detect cycles using DFS
+            var cycles = new List<string>();
+            var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var stack = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            void Visit(string node)
+            {
+                if (stack.Contains(node))
+                {
+                    cycles.Add(node);
+                    return;
+                }
+                if (visited.Contains(node)) return;
+                visited.Add(node);
+                stack.Add(node);
+                foreach (var dep in graph[node].DependsOn)
+                {
+                    if (graph.ContainsKey(dep))
+                        Visit(dep);
+                }
+                stack.Remove(node);
+            }
+            foreach (var node in graph.Keys)
+            {
+                Visit(node);
+            }
+            return cycles.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
     }
 }

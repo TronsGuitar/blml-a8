@@ -185,6 +185,44 @@ dotnet test tests/Integration/
 dotnet test
 ```
 
+### Current failing test status
+
+The current `tests/BLML.Tests/TranspilerTests.cs` suite is failing.
+
+- `11/11` tests currently fail.
+- Most parser failures come from unimplemented methods in `src/Phase1-Foundation/Parser/VB6Parser.cs`.
+- `TranspileFile()` catches those exceptions and records `Transpilation failed: The method or operation is not implemented.`, which leaves `CSharpCode` null and causes the parser assertions to fail.
+
+#### Confirmed causes
+
+- `ParseProperty()` is not implemented.
+- `ParseVariableDeclaration(bool)` is not implemented.
+- `ParseVariableDeclaration()` is not implemented.
+- `ParseReDimStatement()` is not implemented.
+- `ParseExpression()` is not implemented.
+
+These gaps explain the failures for:
+
+- basic sub parsing
+- `If` statements
+- `For` loops
+- `While/Wend`
+- `Do/Loop`
+- `Select Case`
+- built-in functions
+- predefined constants
+
+The lexer test also fails, but the failure output already shows the expected tokens in the returned collection. That one needs separate investigation.
+
+### TODO
+
+- Implement `ParseExpression()` in `VB6Parser`.
+- Implement both `ParseVariableDeclaration` overloads in `VB6Parser`.
+- Implement `ParseProperty()` in `VB6Parser`.
+- Implement `ParseReDimStatement()` in `VB6Parser`.
+- Re-run `BLML.Tests` after parser work is complete.
+- Isolate `Lexer_ShouldTokenizeSimpleExpression` to determine whether the failure is in tokenization or the assertion path.
+
 ---
 
 ## 📖 Documentation
@@ -298,6 +336,22 @@ git push origin feature/my-feature
 - **.NET Core 8** - Backend API
 - **Entity Framework Core** - ORM
 - **SQL Server** - Database
+
+---
+
+## ✅ Final TODO List
+
+1. complete the remaining `Phase1-Foundation` parser work, especially `ParseExpression()`, `ParseVariableDeclaration(...)`, `ParseProperty()`, and `ParseReDimStatement()`
+2. get `tests/BLML.Tests` passing again and isolate the lexer assertion issue
+3. finish `Phase2-CoreLanguage` code-generation and conversion coverage beyond the current partial pipeline
+4. expand `Phase3-FormsUI` form conversion, layout reconstruction, property mapping, and resource conversion
+5. implement the remaining `Phase4-DataAccess` migration pipeline for schema extraction, entity generation, data migration, and ADO modernization
+6. decide and execute the real `Phase5-ASPtoAngular` target architecture, then replace the current prototypes with an actual migration pipeline
+7. extend `Phase6-AdvancedFeatures` into `ParamArray`, named arguments, enums, collections, COM interop, and broader advanced control support
+8. broaden `Phase7-Optimization` into whole-project analysis, migration reporting, code metrics, and safer rewrite support
+9. turn the `Phase8-Tooling` folders into actual projects for CLI, IDE/LSP, VS Code, and web-hosted tooling
+10. add broader fixture-based tests, sample projects, and end-to-end validation across all phases
+11. finish repository polish items such as project packaging, CI coverage, and the top-level license declaration
 
 ---
 

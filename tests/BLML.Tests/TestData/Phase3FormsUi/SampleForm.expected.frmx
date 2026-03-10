@@ -1,0 +1,12 @@
+C# Form: SampleForm
+FormProperty: Caption = "Sample Form"
+
+Control: System.Windows.Forms.Button Name: Command1
+  Caption = "Run"
+  Left = 150
+  Top = 300
+
+Control: System.Windows.Forms.TextBox Name: Text1
+  Left = 150
+  Top = 900
+

@@ -13,10 +13,10 @@ namespace BLML.Tests
             var lexer = new VB6Lexer();
             var tokens = lexer.Tokenize("Dim x As Integer");
             
-            Assert.Contains(tokens, t => t.Type == TokenType.Keyword && t.Value.Equals("Dim", System.StringComparison.OrdinalIgnoreCase));
-            Assert.Contains(tokens, t => t.Type == TokenType.Identifier && t.Value == "x");
-            Assert.Contains(tokens, t => t.Type == TokenType.Keyword && t.Value.Equals("As", System.StringComparison.OrdinalIgnoreCase));
-            Assert.Contains(tokens, t => t.Type == TokenType.Identifier && t.Value == "Integer");
+            Assert.True(tokens.Any(t => t.Type.Equals(TokenType.Keyword) && t.Value == "Dim"), "Expected keyword token 'Dim'.");
+            Assert.True(tokens.Any(t => t.Type.Equals(TokenType.Identifier) && t.Value == "x"), "Expected identifier token 'x'.");
+            Assert.True(tokens.Any(t => t.Type.Equals(TokenType.Keyword) && t.Value.Equals("As", System.StringComparison.OrdinalIgnoreCase)), "Expected keyword token 'As'.");
+            Assert.True(tokens.Any(t => t.Type.Equals(TokenType.Identifier) && t.Value == "Integer"), "Expected identifier token 'Integer'.");
         }
 
         [Fact]

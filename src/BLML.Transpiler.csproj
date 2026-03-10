@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -11,13 +11,49 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Remove="Phase3-FormsUI\**\*.cs" />
+    <Compile Remove="Phase3-FormsUI\ControlMapping\convertVB6AxControlCSharp.cs" />
+    <Compile Remove="Phase3-FormsUI\ControlMapping\WinformPixelToTableLayout.cs" />
+    <Compile Remove="Phase3-FormsUI\FormParsing\vb6formparser.cs" />
+    <Compile Remove="Phase3-FormsUI\FormParsing\vb6binary.cs" />
     <Compile Remove="Phase4-DataAccess\**\*.cs" />
     <Compile Remove="Phase5-ASPtoAngular\**\*.cs" />
     <Compile Remove="Phase6-Advanced\**\*.cs" />
     <Compile Remove="Phase7-Optimization\**\*.cs" />
     <Compile Remove="Phase8-Tooling\**\*.cs" />
     <Compile Remove="Phase2-CoreLanguage\**\*.cs" />
+    <Compile Remove="Phase1-Foundation\Lexer\parseVB6Constants.cs" />
     <!-- Re-including specific files if needed later, but for now focus on Phase 1 -->
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="Phase4-DataAccess\ADO\AdoConverter.cs" />
+    <Compile Include="Phase4-DataAccess\EntityFramework\DbContextGenerator.cs" />
+    <Compile Include="Phase4-DataAccess\EntityFramework\EntityGenerator.cs" />
+    <Compile Include="Phase4-DataAccess\SqlServer\DataMigration.cs" />
+    <Compile Include="Phase4-DataAccess\SqlServer\SchemaGenerator.cs" />
+    <Compile Include="Phase7-Optimization\CodeCleanup\DeadCodeRemover.cs" />
+    <Compile Include="Phase7-Optimization\Documentation\XmlDocGenerator.cs" />
+    <Compile Include="Phase7-Optimization\Refactoring\LinqOptimizer.cs" />
+    <Compile Include="Phase5-ASPtoAngular\Analysis\DatabaseCallAnalyzer.cs" />
+    <Compile Include="Phase5-ASPtoAngular\Analysis\PageFlowAnalyzer.cs" />
+    <Compile Include="Phase5-ASPtoAngular\Analysis\SessionVariableTracker.cs" />
+    <Compile Include="Phase5-ASPtoAngular\AspParser\AspLexer.cs" />
+    <Compile Include="Phase5-ASPtoAngular\AspParser\AspParser.cs" />
+    <Compile Include="Phase5-ASPtoAngular\AspParser\VBScriptParser.cs" />
+    <Compile Include="Phase5-ASPtoAngular\Backend\ApiGenerator\ControllerGenerator.cs" />
+    <Compile Include="Phase5-ASPtoAngular\Backend\ApiGenerator\DtoGenerator.cs" />
+    <Compile Include="Phase5-ASPtoAngular\Backend\ApiGenerator\ServiceGenerator.cs" />
+    <Compile Include="Phase5-ASPtoAngular\Backend\Infrastructure\AuthConverter.cs" />
+    <Compile Include="Phase5-ASPtoAngular\Backend\Infrastructure\MiddlewareGenerator.cs" />
+    <Compile Include="Phase5-ASPtoAngular\Database\EFCoreGenerator.cs" />
+    <Compile Include="Phase5-ASPtoAngular\Database\MigrationScripts.cs" />
+    <Compile Include="Phase5-ASPtoAngular\Database\RepositoryGenerator.cs" />
+    <Compile Include="Phase5-ASPtoAngular\Frontend\ComponentGenerator.cs" />
+    <Compile Include="Phase5-ASPtoAngular\Frontend\FormConverter.cs" />
+    <Compile Include="Phase5-ASPtoAngular\Frontend\RoutingGenerator.cs" />
+    <Compile Include="Phase5-ASPtoAngular\Frontend\TemplateConverter.cs" />
+    <Compile Include="Phase8-Tooling\CLI\CommandLineInterface.cs" />
+    <Compile Include="Phase8-Tooling\CLI\mainprogm.cs" />
+    <Compile Include="Phase8-Tooling\Web\WebConverter.cs" />
   </ItemGroup>
 </Project>

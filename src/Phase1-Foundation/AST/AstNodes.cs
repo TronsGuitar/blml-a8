@@ -46,6 +46,21 @@ namespace BLML.Phase1Foundation.AST
         public List<StatementNode> Body { get; } = new List<StatementNode>();
     }
 
+    public enum PropertyProcedureKind
+    {
+        Get,
+        Let,
+        Set
+    }
+
+    public class PropertyDeclarationNode : DeclarationNode
+    {
+        public PropertyProcedureKind PropertyKind { get; set; }
+        public string Type { get; set; }
+        public List<ParameterNode> Parameters { get; } = new List<ParameterNode>();
+        public List<StatementNode> Body { get; } = new List<StatementNode>();
+    }
+
     public class ParameterNode : AstNode
     {
         public string Name { get; set; }
@@ -53,6 +68,7 @@ namespace BLML.Phase1Foundation.AST
         public bool IsByRef { get; set; }
         public bool IsOptional { get; set; }
         public string DefaultValue { get; set; }
+        public ExpressionNode? DefaultValueExpression { get; set; }
     }
 
     public class ExpressionStatementNode : StatementNode

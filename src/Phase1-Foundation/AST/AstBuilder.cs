@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using BLML.Phase1Foundation.SymbolTable;
 
 namespace BLML.Phase1Foundation.AST
 {
@@ -8,7 +9,9 @@ namespace BLML.Phase1Foundation.AST
     {
         public ModuleNode BuildModule(VB6SyntaxNode syntaxNode)
         {
+#pragma warning disable CS8603 // Possible null reference return.
             if (syntaxNode == null) return null;
+#pragma warning restore CS8603 // Possible null reference return.
             
             if (syntaxNode.Type != NodeType.Module)
                 throw new ArgumentException("Root node must be a Module", nameof(syntaxNode));
@@ -32,7 +35,9 @@ namespace BLML.Phase1Foundation.AST
 
         private DeclarationNode BuildDeclaration(VB6SyntaxNode node)
         {
+#pragma warning disable CS8603 // Possible null reference return.
             if (node == null) return null;
+#pragma warning restore CS8603 // Possible null reference return.
 
             switch (node.Type)
             {
@@ -42,9 +47,11 @@ namespace BLML.Phase1Foundation.AST
                 case NodeType.Variable:
                     return BuildVariable(node);
                 case NodeType.Property:
-                    return BuildMethod(node); // In AST, properties can be treated as special methods or handled separately
+                    return BuildProperty(node);
                 default:
+#pragma warning disable CS8603 // Possible null reference return.
                     return null;
+#pragma warning restore CS8603 // Possible null reference return.
             }
         }
 
@@ -68,7 +75,7 @@ namespace BLML.Phase1Foundation.AST
                 {
                     method.Parameters.Add(BuildParameter(child));
                 }
-                else if (child.Type == NodeType.Statement)
+                else if (child.Type == NodeType.Statement || child.Type == NodeType.Variable)
                 {
                     method.Body.Add(BuildStatement(child));
                 }
@@ -79,14 +86,54 @@ namespace BLML.Phase1Foundation.AST
 
         private ParameterNode BuildParameter(VB6SyntaxNode node)
         {
+            ExpressionNode? defaultValueExpression = null;
+
+            if (node.Attributes.ContainsKey("DefaultValue") && node.Children.Count > 0)
+            {
+                defaultValueExpression = BuildExpression(node.Children[0]);
+            }
+
             return new ParameterNode
             {
                 Name = node.Value,
                 Type = node.Attributes.GetValueOrDefault("Type", "Variant"),
                 IsByRef = !node.Attributes.GetValueOrDefault("ByVal", "false").Equals("true", StringComparison.OrdinalIgnoreCase),
                 IsOptional = node.Attributes.GetValueOrDefault("Optional", "false").Equals("true", StringComparison.OrdinalIgnoreCase),
-                DefaultValue = node.Attributes.GetValueOrDefault("DefaultValue", "")
+                DefaultValue = node.Attributes.GetValueOrDefault("DefaultValue", ""),
+                DefaultValueExpression = defaultValueExpression
             };
+        }
+
+        private PropertyDeclarationNode BuildProperty(VB6SyntaxNode node)
+        {
+            var property = new PropertyDeclarationNode
+            {
+                Name = node.Value,
+                Accessibility = DetermineAccessibility(node),
+                Type = node.Attributes.GetValueOrDefault("ReturnType", "Variant"),
+                PropertyKind = ParsePropertyKind(node.Attributes.GetValueOrDefault("PropertyKind", "Get"))
+            };
+
+            foreach (var child in node.Children)
+            {
+                if (child.Type == NodeType.Variable && child.Attributes.ContainsKey("IsParameter"))
+                {
+                    property.Parameters.Add(BuildParameter(child));
+                }
+                else if (child.Type == NodeType.Statement || child.Type == NodeType.Variable)
+                {
+                    property.Body.Add(BuildStatement(child));
+                }
+            }
+
+            if ((property.PropertyKind == PropertyProcedureKind.Let || property.PropertyKind == PropertyProcedureKind.Set) &&
+                string.Equals(property.Type, "Variant", StringComparison.OrdinalIgnoreCase) &&
+                property.Parameters.Count > 0)
+            {
+                property.Type = property.Parameters[^1].Type;
+            }
+
+            return property;
         }
 
         private VariableDeclarationNode BuildVariable(VB6SyntaxNode node)
@@ -115,7 +162,9 @@ namespace BLML.Phase1Foundation.AST
 
         private StatementNode BuildStatement(VB6SyntaxNode node)
         {
+#pragma warning disable CS8603 // Possible null reference return.
             if (node == null) return null;
+#pragma warning restore CS8603 // Possible null reference return.
 
             switch (node.Type)
             {
@@ -187,18 +236,55 @@ namespace BLML.Phase1Foundation.AST
                     {
                         return BuildSelectCaseStatement(node);
                     }
+#pragma warning disable CS8603 // Possible null reference return.
                     return null;
+#pragma warning restore CS8603 // Possible null reference return.
                 default:
+#pragma warning disable CS8603 // Possible null reference return.
                     return null;
+#pragma warning restore CS8603 // Possible null reference return.
             }
         }
 
         private ExpressionNode BuildExpression(VB6SyntaxNode node)
         {
+#pragma warning disable CS8603 // Possible null reference return.
             if (node == null) return null;
+#pragma warning restore CS8603 // Possible null reference return.
 
             if (node.Type == NodeType.Expression)
             {
+                if (node.Attributes.TryGetValue("LiteralKind", out var literalKind))
+                {
+                    return literalKind switch
+                    {
+                        "Number" when int.TryParse(node.Value, out var i) => new LiteralExpressionNode { Value = i },
+                        "Number" when double.TryParse(node.Value, out var d) => new LiteralExpressionNode { Value = d },
+                        "String" => new LiteralExpressionNode { Value = node.Value },
+                        "Boolean" when bool.TryParse(node.Value, out var b) => new LiteralExpressionNode { Value = b },
+                        _ => new IdentifierExpressionNode { Name = node.Value }
+                    };
+                }
+
+                if (SymbolTableBuilder.PredefinedConstants.TryGetValue(node.Value, out var constantValue))
+                {
+                    return new LiteralExpressionNode { Value = constantValue! };
+                }
+
+                if (node.Attributes.GetValueOrDefault("ExpressionKind") == "Invocation")
+                {
+                    var invoke = new InvocationExpressionNode
+                    {
+                        Target = new IdentifierExpressionNode { Name = node.Value }
+                    };
+                    foreach (var arg in node.Children)
+                    {
+                        var buildExpr = BuildExpression(arg);
+                        if (buildExpr != null) invoke.Arguments.Add(buildExpr);
+                    }
+                    return invoke;
+                }
+
                 if (node.Children.Count == 2)
                 {
                     return new BinaryExpressionNode
@@ -404,6 +490,16 @@ namespace BLML.Phase1Foundation.AST
                 };
             }
             return VB6Accessibility.Private;
+        }
+
+        private static PropertyProcedureKind ParsePropertyKind(string propertyKind)
+        {
+            return propertyKind.ToLowerInvariant() switch
+            {
+                "let" => PropertyProcedureKind.Let,
+                "set" => PropertyProcedureKind.Set,
+                _ => PropertyProcedureKind.Get
+            };
         }
     }
 
