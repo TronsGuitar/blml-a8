@@ -26,7 +26,7 @@ They currently cover:
 - request-level documentation templates
 - dead-code analysis for unused private/public members and unreachable statements
 - cleanup of commented-out code and legacy marker remnants
-- LINQ suggestions for count, sum, and filtered projection loops
+- LINQ suggestions for count, sum, filtered projection, and min/max loops
 
 ### Validation added
 
@@ -36,8 +36,18 @@ Added repository and implementation tests for:
 - task-comment normalization
 - template-driven documentation overrides
 - dead-code cleanup analysis
-- LINQ suggestion generation
+- LINQ suggestion generation including min/max patterns
 - Phase7 README and DONE/status documentation
+
+### Extended LinqOptimizer with Min/Max detection
+
+`LinqOptimizer.cs` now also supports:
+
+- suggesting `.Min(...)` replacements for manual minimum-tracking foreach loops
+- suggesting `.Max(...)` replacements for manual maximum-tracking foreach loops
+- handling both direct loop-variable comparisons (emits `.Min()` / `.Max()`) and member-access expressions (emits `.Min(x => x.Prop)` / `.Max(x => x.Prop)`)
+
+Tests added in `Phase7RefactoringTests.cs` covering both simple and selector-based min/max patterns.
 
 ## Current state
 
@@ -48,7 +58,7 @@ The broader optimization and polish pipeline is still incomplete, but documentat
 ## Remaining follow-up
 
 1. Extend `DeadCodeRemover.cs` into symbol-aware whole-project analysis.
-2. Extend `LinqOptimizer.cs` into broader safe rewrite support for more query and sorting patterns.
+2. Extend `LinqOptimizer.cs` into broader safe rewrite support for additional query and sorting patterns beyond count, sum, projection, and min/max.
 3. Add migration-report and manual-review-list generators.
 4. Add code-metrics helpers.
 5. Connect XML doc generation to full converted-project analysis.

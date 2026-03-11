@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -32,6 +33,11 @@ namespace BLML.Phase7Optimization.Refactoring
                 if (TryCreateProjectionSuggestion(forEach, statements, out var projectionSuggestion))
                 {
                     suggestions.Add(projectionSuggestion!);
+                }
+
+                if (TryCreateMinMaxSuggestion(forEach, statements, out var minMaxSuggestion))
+                {
+                    suggestions.Add(minMaxSuggestion!);
                 }
             }
 
@@ -147,6 +153,84 @@ namespace BLML.Phase7Optimization.Refactoring
             }
 
             return false;
+        }
+
+        private static bool TryCreateMinMaxSuggestion(
+            ForEachStatementSyntax forEach,
+            IReadOnlyList<StatementSyntax> statements,
+            out LinqOptimizationSuggestion? suggestion)
+        {
+            suggestion = null;
+
+            if (statements.Count != 1 ||
+                statements[0] is not IfStatementSyntax { Else: null } ifStatement)
+            {
+                return false;
+            }
+
+            var body = GetSingleStatement(ifStatement.Statement);
+
+            if (body is not ExpressionStatementSyntax
+                {
+                    Expression: AssignmentExpressionSyntax
+                    {
+                        RawKind: (int)SyntaxKind.SimpleAssignmentExpression,
+                        Left: IdentifierNameSyntax accumulatorSyntax,
+                        Right: var valueExpression
+                    }
+                })
+            {
+                return false;
+            }
+
+            if (ifStatement.Condition is not BinaryExpressionSyntax condition)
+            {
+                return false;
+            }
+
+            var accumulatorText = accumulatorSyntax.Identifier.ValueText;
+            var valueText = valueExpression.ToString();
+            var leftText = condition.Left.ToString();
+            var rightText = condition.Right.ToString();
+            var source = forEach.Expression.ToString();
+            var loopVariable = forEach.Identifier.ValueText;
+
+            string linqMethod;
+            if (condition.IsKind(SyntaxKind.GreaterThanExpression) &&
+                leftText == valueText && rightText == accumulatorText)
+            {
+                linqMethod = "Max";
+            }
+            else if (condition.IsKind(SyntaxKind.LessThanExpression) &&
+                     leftText == valueText && rightText == accumulatorText)
+            {
+                linqMethod = "Min";
+            }
+            else
+            {
+                return false;
+            }
+
+            var selector = valueText == loopVariable
+                ? string.Empty
+                : $"{loopVariable} => {valueText}";
+
+            if (!string.IsNullOrEmpty(selector) && !valueText.Contains(loopVariable, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            var replacement = string.IsNullOrEmpty(selector)
+                ? $"var {accumulatorText} = {source}.{linqMethod}();"
+                : $"var {accumulatorText} = {source}.{linqMethod}({selector});";
+
+            suggestion = CreateSuggestion(
+                linqMethod,
+                forEach,
+                $"Manual {linqMethod.ToLowerInvariant()}-tracking loop over '{source}' can be replaced with {linqMethod}().",
+                replacement);
+
+            return true;
         }
 
         private static bool TryGetCounterIncrement(StatementSyntax statement, out string counterName)
