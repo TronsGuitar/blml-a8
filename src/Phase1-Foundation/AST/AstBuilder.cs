@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using BLML.Phase1Foundation.SymbolTable;
 
 namespace BLML.Phase1Foundation.AST
@@ -12,7 +9,7 @@ namespace BLML.Phase1Foundation.AST
 #pragma warning disable CS8603 // Possible null reference return.
             if (syntaxNode == null) return null;
 #pragma warning restore CS8603 // Possible null reference return.
-            
+
             if (syntaxNode.Type != NodeType.Module)
                 throw new ArgumentException("Root node must be a Module", nameof(syntaxNode));
 

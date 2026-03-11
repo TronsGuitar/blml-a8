@@ -1,5 +1,3 @@
-using System;
-
 namespace BLML.Phase5ASPtoAngular.Backend.ApiGenerator
 {
     public class DtoGenerator

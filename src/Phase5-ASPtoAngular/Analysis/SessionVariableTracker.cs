@@ -1,5 +1,3 @@
-using System;
-
 namespace BLML.Phase5ASPtoAngular.Analysis
 {
     public class SessionVariableTracker

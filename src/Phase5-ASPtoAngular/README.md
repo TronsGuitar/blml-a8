@@ -57,3 +57,10 @@ The existing prototype assets currently provide:
 4. generate an API/backend layer for data access, authentication, and query execution
 5. normalize prototype file names and fold the scripts/templates into a supported tool or project structure
 6. add executable tests that validate generated web artifacts instead of only repository/documentation coverage
+
+## What is left to do now
+
+- make the platform decision for this phase: Angular as planned, or a supported Blazor/Razor target
+- replace the current prototype scripts and placeholder templates with a real migration pipeline
+- add ASP/VBScript parsing, backend generation, and metadata-driven UI generation
+- move from documentation-only coverage to executable generation and validation of produced web artifacts

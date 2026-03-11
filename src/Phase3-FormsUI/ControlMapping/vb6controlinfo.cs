@@ -1,5 +1,3 @@
-using System;
-
 namespace Vb6FormParser.Models
 {
     public class Vb6ControlInfo

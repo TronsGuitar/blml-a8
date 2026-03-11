@@ -85,3 +85,10 @@ Reason:
 1. move `vb6binary.cs` into a compatibility project if that code path is still needed
 2. expand golden-file coverage with more real `.frm` samples, especially nested, resource-heavy, and container-heavy forms
 3. broaden property mapping, layout generation, and resource conversion beyond the current tested subset
+
+## What is left to do now
+
+- decide whether `vb6binary.cs` should be restored in a dedicated compatibility project or remain retired from the active build
+- expand form conversion beyond the current simplified WinForms output into fuller designer-quality generation
+- add broader VB6 property, event, control-array, and resource conversion coverage
+- improve layout reconstruction for docking, anchoring intent, and deeper nested container hierarchies

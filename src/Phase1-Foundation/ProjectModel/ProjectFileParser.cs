@@ -1,5 +1,3 @@
-using System;
-
 namespace BLML.Phase1Foundation.ProjectModel
 {
     public class ProjectFileParser

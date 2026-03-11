@@ -1,7 +1,5 @@
-using Xunit;
-using BLML.Phase1Foundation.Parser;
 using BLML.Phase1Foundation.Lexer;
-using BLML.Phase1Foundation.AST;
+using BLML.Phase1Foundation.Parser;
 
 namespace BLML.Tests
 {
@@ -12,7 +10,7 @@ namespace BLML.Tests
         {
             var lexer = new VB6Lexer();
             var tokens = lexer.Tokenize("Dim x As Integer");
-            
+
             Assert.True(tokens.Any(t => t.Type.Equals(TokenType.Keyword) && t.Value == "Dim"), "Expected keyword token 'Dim'.");
             Assert.True(tokens.Any(t => t.Type.Equals(TokenType.Identifier) && t.Value == "x"), "Expected identifier token 'x'.");
             Assert.True(tokens.Any(t => t.Type.Equals(TokenType.Keyword) && t.Value.Equals("As", System.StringComparison.OrdinalIgnoreCase)), "Expected keyword token 'As'.");
@@ -24,7 +22,7 @@ namespace BLML.Tests
         {
             var parser = new VB6Parser();
             var result = parser.TranspileFile("Sub Test()\n  Dim x\n  x = 10\nEnd Sub");
-            
+
             Assert.NotNull(result.CSharpCode);
             Assert.Empty(result.Errors);
             Assert.True(result.CSharpCode.Contains("void Test()"), $"Expected 'void Test()' not found in:\n{result.CSharpCode}");
@@ -44,7 +42,7 @@ Sub CheckValue(y)
     End If
 End Sub";
             var result = parser.TranspileFile(code);
-            
+
             Assert.Empty(result.Errors);
             Assert.Contains("if (y > 10)", result.CSharpCode);
             Assert.Contains("y = 0", result.CSharpCode);
@@ -60,7 +58,7 @@ Function GetLen(s)
     GetLen = Len(s)
 End Function";
             var result = parser.TranspileFile(code);
-            
+
             Assert.Empty(result.Errors);
             Assert.Contains("s.Length", result.CSharpCode);
         }
@@ -178,7 +176,7 @@ End Sub";
             var parser = new VB6Parser();
             var code = $"Sub Test()\n  Dim s\n  s = {vbConstant}\nEnd Sub";
             var result = parser.TranspileFile(code);
-            
+
             Assert.Empty(result.Errors);
         }
     }

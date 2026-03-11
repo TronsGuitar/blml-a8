@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using BLML.Phase1Foundation.ProjectModel; // Ensure this namespace is available
 
 namespace BLML.Phase1Foundation.DependencyGraph
@@ -46,36 +43,36 @@ namespace BLML.Phase1Foundation.DependencyGraph
             }
             foreach (var module in project.Modules)
             {
-                 var node = CreateNode(module, ComponentType.Module);
-                 nodes[node.Name] = node;
+                var node = CreateNode(module, ComponentType.Module);
+                nodes[node.Name] = node;
             }
             foreach (var cls in project.Classes)
             {
-                 var node = CreateNode(cls, ComponentType.Class);
-                 nodes[node.Name] = node;
+                var node = CreateNode(cls, ComponentType.Class);
+                nodes[node.Name] = node;
             }
-             foreach (var ctl in project.UserControls)
+            foreach (var ctl in project.UserControls)
             {
-                 var node = CreateNode(ctl, ComponentType.UserControl);
-                 nodes[node.Name] = node;
+                var node = CreateNode(ctl, ComponentType.UserControl);
+                nodes[node.Name] = node;
             }
-            
+
             // Add References
-            foreach(var refLib in project.References)
+            foreach (var refLib in project.References)
             {
-                 var node = new DependencyNode 
-                 { 
-                     Name = refLib.Description ?? refLib.Guid, 
-                     Type = ComponentType.Reference,
-                     FilePath = refLib.Path
-                 };
-                 if(!nodes.ContainsKey(node.Name))
+                var node = new DependencyNode
+                {
+                    Name = refLib.Description ?? refLib.Guid,
+                    Type = ComponentType.Reference,
+                    FilePath = refLib.Path
+                };
+                if (!nodes.ContainsKey(node.Name))
                     nodes[node.Name] = node;
             }
 
             // TODO: In a real implementation, we would parse each file content here to find references 
             // to other components and populate the DependsOn list.
-            
+
             return nodes;
         }
 

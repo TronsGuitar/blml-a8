@@ -1,9 +1,8 @@
-using System;
 using System.Runtime.InteropServices;
 
 // Example Usage:
 // This part assumes top-level statements are allowed (C# 9.0+)
-class TreesDemo 
+class TreesDemo
 {
     static void Main()
     {

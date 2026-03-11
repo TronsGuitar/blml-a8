@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using BLML.Phase1Foundation.AST;
 
 namespace BLML.Phase1Foundation.SymbolTable
@@ -143,7 +141,7 @@ namespace BLML.Phase1Foundation.SymbolTable
             if (node.Attributes != null)
             {
                 node.Attributes["IsEventSource"] = "true";
-             
+
                 // Logic to register event handlers will be handled by the TypeInference or Translation phase, 
                 // checking against this flag or looking up the type's events.
             }
@@ -155,7 +153,7 @@ namespace BLML.Phase1Foundation.SymbolTable
             // This is primarily for usage analysis.
             // If the node is an identifier used in an expression, we need to check if it refers to a variable
             // that is an object with a default property.
-            
+
             // This logic requires type information which might not be fully available during symbol table construction.
             // However, we can tag variables that we know are controls/objects.
         }

@@ -1,5 +1,3 @@
-using System;
-
 namespace BLML.Phase4DataAccess.EntityFramework
 {
     public class EntityGenerator

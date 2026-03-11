@@ -1,5 +1,4 @@
 using BLML.Phase7Optimization.Refactoring;
-using Xunit;
 
 namespace BLML.Tests;
 

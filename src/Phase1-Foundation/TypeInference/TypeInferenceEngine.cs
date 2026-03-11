@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using BLML.Phase1Foundation.AST;
 
 namespace BLML.Phase1Foundation.TypeInference
@@ -27,16 +25,16 @@ namespace BLML.Phase1Foundation.TypeInference
 
             // Check for undefined variables in identifiers used in expressions/statements
             // Note: This logic depends on the specific node structure for usage vs declaration
-            
+
             // Check for type compatibility in assignments
             if (node.Type == NodeType.Statement && node.Value == "=" && node.Children.Count == 2)
             {
                 var target = node.Children[0];
                 var expr = node.Children[1];
-                
+
                 string targetType = InferType(target);
                 string exprType = InferType(expr);
-                
+
                 // VB6 is permissive, but we can flag obvious issues or document them
                 if (IsIncompatible(targetType, exprType))
                 {
@@ -77,7 +75,7 @@ namespace BLML.Phase1Foundation.TypeInference
             if (node.Value.StartsWith("#")) return "Date";
             if (int.TryParse(node.Value, out _)) return "Integer";
             if (double.TryParse(node.Value, out _)) return "Double";
-            
+
             // Expression inference
             if (node.Type == NodeType.Expression)
             {

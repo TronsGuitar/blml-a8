@@ -1,8 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using BLML.Phase1Foundation.SymbolTable;
+using System.Text;
 
 namespace BLML.Phase1Foundation.Lexer
 {
@@ -77,7 +74,7 @@ namespace BLML.Phase1Foundation.Lexer
                 }
 
                 // Handle comments
-                if (current == '\'' || (current == 'R' && index + 2 < code.Length && 
+                if (current == '\'' || (current == 'R' && index + 2 < code.Length &&
                     code.Substring(index, 3).Equals("REM", StringComparison.OrdinalIgnoreCase)))
                 {
                     var comment = ParseComment(code, ref index, ref line, ref column);
@@ -106,7 +103,7 @@ namespace BLML.Phase1Foundation.Lexer
                 }
 
                 // Handle numbers
-                if (char.IsDigit(current) || (current == '.' && index + 1 < code.Length && 
+                if (char.IsDigit(current) || (current == '.' && index + 1 < code.Length &&
                     char.IsDigit(code[index + 1])))
                 {
                     var number = ParseNumber(code, ref index, ref column);
@@ -127,7 +124,7 @@ namespace BLML.Phase1Foundation.Lexer
                     var tokenType = reservedKeywords.Contains(identifier) ? TokenType.Keyword :
                                     predefinedConstants.Contains(identifier) ? TokenType.Identifier : // Treat as identifier for now, or add PredefinedConstant to TokenType
                                     TokenType.Identifier;
-                    
+
                     tokens.Add(new VB6Token
                     {
                         Type = tokenType,
@@ -171,7 +168,7 @@ namespace BLML.Phase1Foundation.Lexer
         {
             var comment = new StringBuilder();
             var isREM = code.Substring(index).StartsWith("REM", StringComparison.OrdinalIgnoreCase);
-            
+
             // Skip the comment marker (' or REM)
             index += isREM ? 3 : 1;
             column += isREM ? 3 : 1;

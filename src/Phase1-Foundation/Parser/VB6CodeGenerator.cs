@@ -1,12 +1,9 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
+using BLML.Phase1Foundation.AST;
+using BLML.Phase1Foundation.SymbolTable;
+using BLML.Phase6AdvancedFeatures;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using BLML.Phase1Foundation.AST;
-using BLML.Phase6AdvancedFeatures;
-using BLML.Phase1Foundation.SymbolTable;
 
 namespace BLML.Phase1Foundation.Parser
 {
@@ -34,7 +31,7 @@ namespace BLML.Phase1Foundation.Parser
             };
 
             var members = new List<MemberDeclarationSyntax>();
-            
+
             // In C#, we usually wrap logic in a class
             var classDecl = SyntaxFactory.ClassDeclaration(module.Name)
                 .AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword), SyntaxFactory.Token(SyntaxKind.PartialKeyword));
@@ -114,7 +111,7 @@ namespace BLML.Phase1Foundation.Parser
         private MethodDeclarationSyntax GenerateMethod(MethodDeclarationNode node)
         {
             var returnType = ParseVB6Type(node.ReturnType);
-            
+
             var parameters = node.Parameters.Select(GenerateParameter).ToArray();
 
             var bodyStatements = node.Body.Select(GenerateStatement).Where(s => s != null).ToArray();
@@ -277,10 +274,10 @@ namespace BLML.Phase1Foundation.Parser
             {
                 var condition = GenerateExpression(ifStmt.Condition);
                 var trueBlock = SyntaxFactory.Block(ifStmt.TrueBlock.Statements.Select(GenerateStatement));
-                var elseClause = ifStmt.ElseBlock != null 
-                    ? SyntaxFactory.ElseClause(SyntaxFactory.Block(ifStmt.ElseBlock.Statements.Select(GenerateStatement))) 
+                var elseClause = ifStmt.ElseBlock != null
+                    ? SyntaxFactory.ElseClause(SyntaxFactory.Block(ifStmt.ElseBlock.Statements.Select(GenerateStatement)))
                     : null;
-                
+
                 return SyntaxFactory.IfStatement(condition, trueBlock, elseClause);
             }
             if (node is VariableDeclarationNode varDecl)

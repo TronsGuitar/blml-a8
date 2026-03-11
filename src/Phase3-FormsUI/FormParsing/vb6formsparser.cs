@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Text.RegularExpressions;
 using Vb6FormParser.Models;
 
@@ -30,7 +26,7 @@ namespace Vb6FormParser.Parser
         public static List<Vb6ControlInfo> ParseForms(string rootFolder)
         {
             var allControls = new List<Vb6ControlInfo>();
-            
+
             // Get all .frm files in the root folder + subfolders
             var frmFiles = Directory.GetFiles(rootFolder, "*.frm", SearchOption.AllDirectories);
 

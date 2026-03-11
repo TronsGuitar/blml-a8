@@ -1,5 +1,3 @@
-using System;
-
 namespace BLML.Phase4DataAccess.ADO
 {
     public class AdoConverter

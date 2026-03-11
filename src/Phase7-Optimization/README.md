@@ -91,3 +91,10 @@ Added executable tests for:
 4. add code-metrics output for complexity and maintainability reporting
 5. connect `XmlDocGenerator` to parsed project/module output instead of using only direct signature requests
 6. add broader Phase7 tests with representative converted-code fixtures
+
+## What is left to do now
+
+- turn the current helper-style utilities into project-aware analysis and reporting tools
+- move dead-code detection from heuristic per-file scans to symbol-aware whole-project analysis
+- expand LINQ optimization from suggestions into optional safe rewrites for more patterns
+- add migration reports, manual review outputs, and code metrics so Phase7 helps guide remediation work at scale

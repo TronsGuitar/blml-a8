@@ -95,3 +95,11 @@ The Phase6 work added in this pass is:
 5. add VB6 `Enum` parsing and C# enum generation
 6. extend Phase3 control mapping for `SSTab`, `MSFlexGrid`, `TreeView`, `ListView`, `CommonDialog`, and `RichTextBox`
 7. add more executable tests with representative VB6 samples for each advanced feature area
+
+## What is left to do now
+
+- extend Phase6 from the current property/optional-parameter slice into the larger VB6 advanced-feature set
+- handle named arguments, `ParamArray`, late binding, and `Collection` semantics
+- add COM and Windows interop conversion for `CreateObject`, API declares, and `DllImport`
+- broaden advanced control coverage beyond the current ActiveX groundwork
+- keep adding representative fixtures so each advanced feature area has executable coverage

@@ -144,14 +144,24 @@ See [ProjectPlan.md](ProjectPlan.md) for detailed breakdown.
 
 | Phase | Status | Priority | Timeline |
 |-------|--------|----------|----------|
-| **Phase 1:** Foundation | 🟡 Active and partially implemented | CRITICAL | Weeks 1-4 |
-| **Phase 2:** Core Language | 🔴 Incomplete / not fully documented in current pass | HIGH | Weeks 5-8 |
+| **Phase 1:** Foundation | 🟡 Active foundation slice with remaining integration work documented | CRITICAL | Weeks 1-4 |
+| **Phase 2:** Core Language | 🟡 Focused error-handling slice active; remaining work documented | HIGH | Weeks 5-8 |
 | **Phase 3:** Forms & UI | 🟡 Partially implemented and tested | HIGH | Weeks 9-12 |
 | **Phase 4:** Data Access | 🟡 Partially implemented | HIGH | Weeks 9-12 |
 | **Phase 5:** ASP to Angular | 🟠 Prototype-only assets | HIGH | Weeks 13-20 |
 | **Phase 6:** Advanced Features | 🟡 First implementation slice active | MEDIUM | Weeks 21-24 |
 | **Phase 7:** Optimization | 🟡 Multiple helper slices active | MEDIUM | Weeks 25-26 |
 | **Phase 8:** Tooling | 🟠 Documentation, stubs, and prototypes | LOW | Ongoing |
+
+For phase-specific remaining work, see:
+
+- [Phase 1 README](src/Phase1-Foundation/README.md)
+- [Phase 2 README](src/Phase2-CoreLanguage/README.md)
+- [Phase 3 README](src/Phase3-FormsUI/README.md)
+- [Phase 4 README](src/Phase4-DataAccess/README.md)
+- [Phase 5 README](src/Phase5-ASPtoAngular/README.md)
+- [Phase 6 README](src/Phase6-AdvancedFeatures/README.md)
+- [Phase 7 README](src/Phase7-Optimization/README.md)
 
 ---
 

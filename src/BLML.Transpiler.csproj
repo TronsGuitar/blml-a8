@@ -20,7 +20,6 @@
     <Compile Remove="Phase6-Advanced\**\*.cs" />
     <Compile Remove="Phase7-Optimization\**\*.cs" />
     <Compile Remove="Phase8-Tooling\**\*.cs" />
-    <Compile Remove="Phase2-CoreLanguage\**\*.cs" />
     <Compile Remove="Phase1-Foundation\Lexer\parseVB6Constants.cs" />
     <!-- Re-including specific files if needed later, but for now focus on Phase 1 -->
   </ItemGroup>
@@ -52,8 +51,13 @@
     <Compile Include="Phase5-ASPtoAngular\Frontend\FormConverter.cs" />
     <Compile Include="Phase5-ASPtoAngular\Frontend\RoutingGenerator.cs" />
     <Compile Include="Phase5-ASPtoAngular\Frontend\TemplateConverter.cs" />
-    <Compile Include="Phase8-Tooling\CLI\CommandLineInterface.cs" />
-    <Compile Include="Phase8-Tooling\CLI\mainprogm.cs" />
-    <Compile Include="Phase8-Tooling\Web\WebConverter.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Phase2-CoreLanguage\Project\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Phase8-Tooling\CLI\BLML.Tooling.Cli.csproj" />
   </ItemGroup>
 </Project>

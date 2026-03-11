@@ -27,7 +27,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Phase8-Tooling\CLI\BLML.Tooling.Cli.csproj" />
     <ProjectReference Include="..\..\src\BLML.Transpiler.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="TestProjects\" />
   </ItemGroup>
 
 </Project>

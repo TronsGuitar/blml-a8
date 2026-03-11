@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using BLML.Phase1Foundation.AST;
 using BLML.Phase1Foundation.Lexer;
 using BLML.Phase1Foundation.SymbolTable;
@@ -23,7 +20,7 @@ namespace BLML.Phase1Foundation.Parser
         public TranspilerResult TranspileFile(string vb6Code)
         {
             var result = new TranspilerResult();
-            
+
             try
             {
                 currentTokenIndex = 0;
@@ -176,7 +173,7 @@ namespace BLML.Phase1Foundation.Parser
             {
                 funcNode.Attributes["Accessibility"] = accessibility;
             }
-            
+
             ParseParameters(funcNode);
             if (Match("As"))
             {
@@ -448,7 +445,7 @@ namespace BLML.Phase1Foundation.Parser
 
             // True block
             var trueBlock = new VB6SyntaxNode { Type = NodeType.Statement, Value = "Then" };
-            while (PeekToken() != null && !PeekToken().Value.Equals("Else", StringComparison.OrdinalIgnoreCase) && 
+            while (PeekToken() != null && !PeekToken().Value.Equals("Else", StringComparison.OrdinalIgnoreCase) &&
                    !PeekToken().Value.Equals("End", StringComparison.OrdinalIgnoreCase))
             {
                 var stmt = ParseStatement();

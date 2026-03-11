@@ -69,3 +69,10 @@ The Entity Framework generator now supports:
 3. implement `EntityGenerator.cs` and `DataMigration.cs` for end-to-end SQL Server and EF Core scaffolding
 4. implement `AdoConverter.cs` to migrate VB6/ADO usage toward ADO.NET or repository-based access
 5. add integration tests that connect schema extraction, EF scaffolding, and a real `.mdb` or `.accdb` sample when fixtures are available
+
+## What is left to do now
+
+- move from manually supplied metadata to real schema extraction
+- implement the placeholder .NET generators so Phase4 becomes an end-to-end migration pipeline rather than isolated helpers
+- connect Access discovery, SQL Server scaffolding, EF Core generation, and data migration into a single supported flow
+- add integration coverage against representative Access fixtures when they are available

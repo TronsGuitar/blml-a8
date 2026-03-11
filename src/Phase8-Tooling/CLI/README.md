@@ -2,9 +2,9 @@
 
 ## Status
 
-- **Current status:** compile-safe placeholder and sample entry point
-- **Validated state:** the current CLI files compile as part of the active `.NET 8` solution after stub helpers were added for the sample program
-- **Known gap:** there is still no dedicated CLI project, command parser, or user-facing command surface
+- **Current status:** dedicated `.NET 8` console application with active command handling
+- **Validated state:** the CLI now has its own project, references the transpiler, and is covered by executable tests
+- **Known gap:** command coverage is still partial and project-wide orchestration remains limited
 
 ## Purpose
 
@@ -14,8 +14,9 @@ Its project should provide a stable automation surface for running VB6 analysis 
 
 ## Current assets
 
-- `CommandLineInterface.cs` contains the intended CLI responsibilities as TODO notes.
-- `mainprogm.cs` is an early sample program that parses VB6 form files and emits CSV and project output.
+- `BLML.Tooling.Cli.csproj` is the dedicated console application project.
+- `CommandLineInterface.cs` now contains command parsing, dispatch, progress reporting, and exit-code handling.
+- `mainprogm.cs` is now the real console entry point.
 
 ## Project scope
 
@@ -28,6 +29,24 @@ The future `CLI` project should:
 - support local use, CI, and scripted automation
 
 ## Functional requirements
+
+### Implemented command surface
+
+The CLI currently supports:
+
+- `analyze`
+- `convert`
+- `validate`
+- `form-export`
+- `help`
+
+Supported options include:
+
+- `--input` / `-i`
+- `--output` / `-o`
+- `--phase` / `-p`
+- `--verbose` / `-v`
+- `--help` / `-h`
 
 ### Command surface
 
@@ -80,12 +99,22 @@ The CLI must provide:
 
 ## Implementation plan
 
-1. create a dedicated console project in this folder
-2. move `mainprogm.cs` sample behavior behind a formal command
-3. replace placeholder `CommandLineInterface` logic with a real command dispatcher
-4. connect commands to Phase1 through Phase7 library entry points
-5. add JSON report models for automation scenarios
-6. add tests for argument parsing, exit codes, and failure paths
+Completed in this pass:
+
+1. created a dedicated console project in this folder
+2. moved `mainprogm.cs` sample behavior behind formal commands
+3. replaced placeholder `CommandLineInterface` logic with a real command dispatcher
+4. connected commands to active transpiler entry points in Phase1 and Phase3
+5. added JSON report output for automation scenarios
+6. added tests for argument parsing, exit codes, and file-output flows
+
+Remaining follow-up:
+
+1. broaden command coverage to include richer project-wide conversion orchestration
+2. add more reporting, validation, and diagnostics commands
+3. decide whether to adopt `System.CommandLine` or keep the lightweight parser
+4. connect the CLI to more Phase4 through Phase7 orchestration paths
+5. add more failure-path and end-to-end integration tests
 
 ## Initial project structure
 
