@@ -68,4 +68,64 @@ public class Phase7RefactoringTests
             suggestion.Category == "Projection" &&
             suggestion.SuggestedReplacement.Contains("customers.Where(customer => customer.IsActive).Select(customer => customer.Name).ToList()"));
     }
+
+    [Fact]
+    public void LinqOptimizer_ShouldSuggestMinMaxReplacements()
+    {
+        var optimizer = new LinqOptimizer();
+        var suggestions = optimizer.SuggestOptimizations("""
+            using System.Collections.Generic;
+
+            public class Sample
+            {
+                public void Run(IEnumerable<int> numbers)
+                {
+                    var maxVal = int.MinValue;
+                    foreach (var number in numbers)
+                    {
+                        if (number > maxVal) maxVal = number;
+                    }
+
+                    var minVal = int.MaxValue;
+                    foreach (var number in numbers)
+                    {
+                        if (number < minVal) minVal = number;
+                    }
+                }
+            }
+            """);
+
+        Assert.Contains(suggestions, s => s.Category == "Max" && s.SuggestedReplacement.Contains("numbers.Max()"));
+        Assert.Contains(suggestions, s => s.Category == "Min" && s.SuggestedReplacement.Contains("numbers.Min()"));
+    }
+
+    [Fact]
+    public void LinqOptimizer_ShouldSuggestMaxWithSelectorForMemberAccess()
+    {
+        var optimizer = new LinqOptimizer();
+        var suggestions = optimizer.SuggestOptimizations("""
+            using System.Collections.Generic;
+
+            public class Order
+            {
+                public decimal Amount { get; set; }
+            }
+
+            public class Sample
+            {
+                public void Run(IEnumerable<Order> orders)
+                {
+                    var highest = 0m;
+                    foreach (var order in orders)
+                    {
+                        if (order.Amount > highest) highest = order.Amount;
+                    }
+                }
+            }
+            """);
+
+        Assert.Contains(suggestions, s =>
+            s.Category == "Max" &&
+            s.SuggestedReplacement.Contains("orders.Max(order => order.Amount)"));
+    }
 }
