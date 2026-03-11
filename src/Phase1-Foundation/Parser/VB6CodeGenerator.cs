@@ -303,6 +303,10 @@ namespace BLML.Phase1Foundation.Parser
             {
                 return GenerateSelectCaseStatement(selectStmt);
             }
+            if (node is ExitStatementNode)
+            {
+                return SyntaxFactory.BreakStatement();
+            }
 
             return SyntaxFactory.EmptyStatement();
         }

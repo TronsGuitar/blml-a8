@@ -233,6 +233,13 @@ namespace BLML.Phase1Foundation.AST
                     {
                         return BuildSelectCaseStatement(node);
                     }
+                    if (node.Value == "Exit")
+                    {
+                        return new ExitStatementNode
+                        {
+                            ExitKind = node.Attributes.GetValueOrDefault("ExitKind", string.Empty)
+                        };
+                    }
 #pragma warning disable CS8603 // Possible null reference return.
                     return null;
 #pragma warning restore CS8603 // Possible null reference return.

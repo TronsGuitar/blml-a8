@@ -47,6 +47,7 @@ It now supports:
 - suggesting `.Count(predicate)` replacements for simple conditional counting loops
 - suggesting `.Sum(...)` replacements for manual accumulator loops
 - suggesting `.Select().ToList()` and `.Where().Select().ToList()` replacements for common projection loops
+- suggesting `.Min(...)` and `.Max(...)` replacements for manual min/max tracking loops
 
 ### Validation added
 
@@ -56,7 +57,7 @@ Added executable tests for:
 - task-comment normalization
 - template-based documentation overrides
 - dead-code analysis and cleanup of commented-out conversion remnants
-- loop-to-LINQ suggestion generation for count, sum, and projection patterns
+- loop-to-LINQ suggestion generation for count, sum, projection, and min/max patterns
 - Phase7 README and status-document coverage
 
 ## Existing prerequisites already present in the repository
@@ -70,6 +71,7 @@ Added executable tests for:
 
 - currently focuses on common foreach-loop patterns rather than full expression-tree or semantic-query rewriting
 - currently emits suggestions rather than rewriting source automatically
+- supports count, sum, projection, and min/max patterns
 
 ## Not implemented yet
 
@@ -77,7 +79,7 @@ Added executable tests for:
 
 - XML doc generation currently operates on supplied VB6 signatures and comments rather than a whole-project analysis pipeline
 - dead-code analysis currently works per file and does not yet use semantic symbol resolution across projects
-- LINQ optimization currently covers only count, sum, and projection suggestion patterns
+- LINQ optimization currently covers count, sum, projection, and min/max suggestion patterns
 - there is no migration report generator yet
 - there is no manual review list generator yet
 - there are no code-metrics helpers yet
@@ -86,7 +88,7 @@ Added executable tests for:
 ## TODO
 
 1. extend `DeadCodeRemover.cs` from per-file heuristics into symbol-aware whole-project analysis
-2. extend `LinqOptimizer.cs` beyond suggestion-only output into optional safe rewrites for more loop and sorting patterns
+2. extend `LinqOptimizer.cs` into optional safe rewrites and additional patterns beyond count, sum, projection, and min/max
 3. add migration-report and manual-review-list generators
 4. add code-metrics output for complexity and maintainability reporting
 5. connect `XmlDocGenerator` to parsed project/module output instead of using only direct signature requests
