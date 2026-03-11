@@ -161,6 +161,12 @@ namespace BLML.Phase1Foundation.AST
         public BlockNode Body { get; set; } = new BlockNode();
     }
 
+    public class ExitStatementNode : StatementNode
+    {
+        /// <summary>What is being exited: "For", "Do", "Sub", "Function"</summary>
+        public string ExitKind { get; set; } = string.Empty;
+    }
+
     // Array-related nodes
     public class ArrayAccessExpressionNode : ExpressionNode
     {

@@ -359,6 +359,8 @@ namespace BLML.Phase1Foundation.Parser
                     return ParseVariableDeclaration();
                 case "redim":
                     return ParseReDimStatement();
+                case "exit":
+                    return ParseExitStatement();
                 default:
                     // If it's an identifier followed by an equal sign, it's an assignment
                     if (token.Type == BLML.Phase1Foundation.Lexer.TokenType.Identifier)
@@ -419,6 +421,19 @@ namespace BLML.Phase1Foundation.Parser
         private VB6SyntaxNode ParseVariableDeclaration()
         {
             return ParseVariableDeclaration(false);
+        }
+
+        private VB6SyntaxNode ParseExitStatement()
+        {
+            SkipToken(); // Skip 'Exit'
+            var exitKind = GetToken()?.Value ?? string.Empty; // 'For', 'Do', 'Sub', 'Function', etc.
+            var exitNode = new VB6SyntaxNode
+            {
+                Type = NodeType.Statement,
+                Value = "Exit"
+            };
+            exitNode.Attributes["ExitKind"] = exitKind;
+            return exitNode;
         }
 
         private VB6SyntaxNode ParseAssignment()

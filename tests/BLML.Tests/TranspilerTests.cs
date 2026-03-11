@@ -181,5 +181,45 @@ End Sub";
             
             Assert.Empty(result.Errors);
         }
+
+        [Fact]
+        public void Parser_ShouldParseExitFor()
+        {
+            var parser = new VB6Parser();
+            var code = @"
+Sub TestExitFor()
+    Dim i
+    For i = 1 To 10
+        If i = 5 Then
+            Exit For
+        End If
+    Next i
+End Sub";
+            var result = parser.TranspileFile(code);
+
+            Assert.Empty(result.Errors);
+            Assert.Contains("break;", result.CSharpCode);
+        }
+
+        [Fact]
+        public void Parser_ShouldParseExitDo()
+        {
+            var parser = new VB6Parser();
+            var code = @"
+Sub TestExitDo()
+    Dim x
+    x = 0
+    Do While x < 10
+        If x = 5 Then
+            Exit Do
+        End If
+        x = x + 1
+    Loop
+End Sub";
+            var result = parser.TranspileFile(code);
+
+            Assert.Empty(result.Errors);
+            Assert.Contains("break;", result.CSharpCode);
+        }
     }
 }
