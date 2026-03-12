@@ -358,6 +358,14 @@ namespace BLML.Phase1Foundation.Parser
                     return ParseReDimStatement();
                 case "exit":
                     return ParseExitStatement();
+                case "call":
+                    SkipToken(); // Skip 'Call'
+                    var callExpr = ParseExpression();
+                    return callExpr != null
+                        ? new VB6SyntaxNode { Type = NodeType.Statement, Value = "Expression", Children = { callExpr } }
+                        : null;
+                case "on":
+                    return ParseOnErrorStatement();
                 default:
                     // If it's an identifier followed by an equal sign, it's an assignment
                     if (token.Type == BLML.Phase1Foundation.Lexer.TokenType.Identifier)
@@ -431,6 +439,27 @@ namespace BLML.Phase1Foundation.Parser
             };
             exitNode.Attributes["ExitKind"] = exitKind;
             return exitNode;
+        }
+
+        private VB6SyntaxNode ParseOnErrorStatement()
+        {
+            SkipToken(); // Skip 'On'
+            Match("Error"); // Skip 'Error'
+            var onErrorNode = new VB6SyntaxNode { Type = NodeType.Statement, Value = "OnError" };
+
+            if (Match("Resume"))
+            {
+                Match("Next"); // Skip 'Next'
+                onErrorNode.Attributes["OnErrorKind"] = "ResumeNext";
+            }
+            else if (Match("GoTo"))
+            {
+                var label = GetToken()?.Value ?? "0";
+                onErrorNode.Attributes["OnErrorKind"] = "GoTo";
+                onErrorNode.Attributes["Label"] = label;
+            }
+
+            return onErrorNode;
         }
 
         private VB6SyntaxNode ParseAssignment()
@@ -792,6 +821,22 @@ namespace BLML.Phase1Foundation.Parser
 
             if (token.Type == BLML.Phase1Foundation.Lexer.TokenType.Identifier || token.Type == BLML.Phase1Foundation.Lexer.TokenType.Keyword)
             {
+                // Handle 'Not' as a unary prefix operator
+                if (token.Value.Equals("Not", StringComparison.OrdinalIgnoreCase))
+                {
+                    SkipToken(); // skip 'Not'
+                    var operand = ParsePrimaryExpression();
+                    if (operand != null)
+                    {
+                        return new VB6SyntaxNode
+                        {
+                            Type = NodeType.Expression,
+                            Value = "Not",
+                            Children = { operand }
+                        };
+                    }
+                }
+
                 SkipToken();
 
                 var expressionNode = new VB6SyntaxNode

@@ -240,6 +240,18 @@ namespace BLML.Phase1Foundation.AST
                             ExitKind = node.Attributes.GetValueOrDefault("ExitKind", string.Empty)
                         };
                     }
+                    if (node.Value == "OnError")
+                    {
+                        var kind = node.Attributes.GetValueOrDefault("OnErrorKind", "ResumeNext");
+                        if (kind == "GoTo")
+                        {
+                            return new OnErrorGoToStatementNode
+                            {
+                                Label = node.Attributes.GetValueOrDefault("Label", "0")
+                            };
+                        }
+                        return new OnErrorResumeNextStatementNode();
+                    }
 #pragma warning disable CS8603 // Possible null reference return.
                     return null;
 #pragma warning restore CS8603 // Possible null reference return.

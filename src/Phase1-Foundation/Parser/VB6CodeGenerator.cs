@@ -303,9 +303,16 @@ namespace BLML.Phase1Foundation.Parser
             {
                 return GenerateSelectCaseStatement(selectStmt);
             }
-            if (node is ExitStatementNode)
+            if (node is ExitStatementNode exitStmt)
             {
-                return SyntaxFactory.BreakStatement();
+                var exitKind = exitStmt.ExitKind?.ToLowerInvariant();
+                return exitKind == "sub" || exitKind == "function"
+                    ? SyntaxFactory.ReturnStatement()
+                    : SyntaxFactory.BreakStatement();
+            }
+            if (node is OnErrorResumeNextStatementNode || node is OnErrorGoToStatementNode)
+            {
+                return SyntaxFactory.EmptyStatement();
             }
 
             return SyntaxFactory.EmptyStatement();
@@ -581,6 +588,8 @@ namespace BLML.Phase1Foundation.Parser
                     ">" => SyntaxKind.GreaterThanExpression,
                     "<=" => SyntaxKind.LessThanOrEqualExpression,
                     ">=" => SyntaxKind.GreaterThanOrEqualExpression,
+                    "And" => SyntaxKind.LogicalAndExpression,
+                    "Or" => SyntaxKind.LogicalOrExpression,
                     _ => SyntaxKind.None
                 };
 
@@ -594,6 +603,15 @@ namespace BLML.Phase1Foundation.Parser
                 {
                     var generatedArguments = invoke.Arguments.Select(a => GenerateExpression(a).ToString()).ToArray();
                     return SyntaxFactory.ParseExpression(BuiltInFunctionHandler.GenerateCShrapCall(targetIdentifier.Name, generatedArguments));
+                }
+
+                // Handle 'Not' as a unary logical-not expression
+                if (invoke.Target is IdentifierExpressionNode { Name: var invokeName } &&
+                    invokeName.Equals("Not", StringComparison.OrdinalIgnoreCase) &&
+                    invoke.Arguments.Count == 1)
+                {
+                    return SyntaxFactory.PrefixUnaryExpression(SyntaxKind.LogicalNotExpression,
+                        SyntaxFactory.ParenthesizedExpression(GenerateExpression(invoke.Arguments[0])));
                 }
 
                 var args = invoke.Arguments.Select(a => SyntaxFactory.Argument(GenerateExpression(a))).ToArray();
