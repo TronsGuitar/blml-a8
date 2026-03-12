@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using BLML.Phase1Foundation.AST;
 
 namespace BLML.Phase2CoreLanguage.Converters
 {
@@ -23,110 +24,20 @@ namespace BLML.Phase2CoreLanguage.Converters
             var procedure = ParseProcedure(vb6Code);
             var manualReviewItems = new List<string>();
             var detectedPatterns = procedure.DetectedPatterns.ToList();
-
             var builder = new StringBuilder();
+
             if (procedure.RequiresErrObject)
             {
                 builder.AppendLine("Vb6RuntimeException? __vb6Err = null;");
             }
 
-            var goToLabel = procedure.FirstGoToLabel;
-            var inResumeNextScope = false;
-            var inHandler = false;
-            var tryOpened = false;
-
-            if (goToLabel is not null)
+            if (!string.IsNullOrWhiteSpace(procedure.FirstGoToLabel))
             {
-                builder.AppendLine("try");
-                builder.AppendLine("{");
-                tryOpened = true;
+                AppendGoToHandlerProcedure(builder, procedure, manualReviewItems);
             }
-
-            foreach (var statement in procedure.Statements)
+            else
             {
-                switch (statement)
-                {
-                    case OnErrorResumeNextStatement:
-                        inResumeNextScope = true;
-                        break;
-                    case OnErrorGoToStatement goToStatement when string.Equals(goToStatement.Label, "0", StringComparison.Ordinal):
-                        inResumeNextScope = false;
-                        break;
-                    case LabelStatement labelStatement:
-                        if (tryOpened && !inHandler && string.Equals(labelStatement.Label, goToLabel, StringComparison.OrdinalIgnoreCase))
-                        {
-                            builder.AppendLine("}");
-                            builder.AppendLine("catch (Exception ex)");
-                            builder.AppendLine("{");
-                            if (procedure.RequiresErrObject)
-                            {
-                                builder.AppendLine("    __vb6Err = Vb6RuntimeException.FromException(ex);");
-                            }
-                            builder.AppendLine($"    // Equivalent of VB6 'On Error GoTo {goToLabel}'");
-                            builder.AppendLine($"    goto {goToLabel};");
-                            builder.AppendLine("}");
-                            inHandler = true;
-                        }
-
-                        builder.AppendLine($"{labelStatement.Label}:");
-                        break;
-                    case ResumeNextStatement:
-                        manualReviewItems.Add("Resume Next requires manual review because the original control-flow target is context dependent.");
-                        builder.AppendLine("// TODO: Resume Next requires manual review.");
-                        break;
-                    case ResumeStatement resumeStatement when !string.IsNullOrWhiteSpace(resumeStatement.TargetLabel):
-                        if (procedure.RequiresErrObject)
-                        {
-                            builder.AppendLine("__vb6Err = null;");
-                        }
-                        builder.AppendLine($"goto {resumeStatement.TargetLabel};");
-                        break;
-                    case ResumeStatement:
-                        manualReviewItems.Add("Resume requires manual review because the original failure point must be reconstructed.");
-                        builder.AppendLine("// TODO: Resume requires manual review.");
-                        break;
-                    case ExecutableStatement executableStatement:
-                        var convertedLine = ConvertExecutableLine(executableStatement.Text);
-
-                        if (inResumeNextScope)
-                        {
-                            builder.AppendLine("try");
-                            builder.AppendLine("{");
-                            builder.AppendLine($"    {convertedLine}");
-                            builder.AppendLine("}");
-                            builder.AppendLine("catch (Exception ex)");
-                            builder.AppendLine("{");
-                            if (procedure.RequiresErrObject)
-                            {
-                                builder.AppendLine("    __vb6Err = Vb6RuntimeException.FromException(ex);");
-                            }
-                            builder.AppendLine("    // VB6 'On Error Resume Next' ignored the failing statement.");
-                            builder.AppendLine("}");
-                        }
-                        else if (tryOpened && !inHandler)
-                        {
-                            builder.AppendLine($"    {convertedLine}");
-                        }
-                        else
-                        {
-                            builder.AppendLine(convertedLine);
-                        }
-
-                        break;
-                }
-            }
-
-            if (tryOpened && !inHandler)
-            {
-                builder.AppendLine("}");
-                builder.AppendLine("catch (Exception ex)");
-                builder.AppendLine("{");
-                if (procedure.RequiresErrObject)
-                {
-                    builder.AppendLine("    __vb6Err = Vb6RuntimeException.FromException(ex);");
-                }
-                builder.AppendLine("    throw;");
-                builder.AppendLine("}");
+                AppendLinearProcedure(builder, procedure, manualReviewItems);
             }
 
             return new ErrorHandlingConversionResult
@@ -138,10 +49,246 @@ namespace BLML.Phase2CoreLanguage.Converters
             };
         }
 
-        private static ErrorHandlingProcedure ParseProcedure(string vb6Code)
+        private static void AppendLinearProcedure(StringBuilder builder, ErrorHandlingProcedureNode procedure, List<string> manualReviewItems)
         {
-            var statements = new List<ErrorHandlingStatement>();
-            var labels = new List<string>();
+            var inResumeNextScope = false;
+
+            foreach (var statement in procedure.Statements)
+            {
+                switch (statement)
+                {
+                    case OnErrorResumeNextStatementNode:
+                        inResumeNextScope = true;
+                        break;
+                    case OnErrorGoToStatementNode goToStatement when string.Equals(goToStatement.Label, "0", StringComparison.Ordinal):
+                        inResumeNextScope = false;
+                        break;
+                    case LabelStatementNode labelStatement:
+                        builder.AppendLine($"{labelStatement.Label}:");
+                        break;
+                    case ResumeNextStatementNode:
+                        manualReviewItems.Add("Resume Next requires manual review when no active 'On Error GoTo' handler is available.");
+                        builder.AppendLine("// TODO: Resume Next requires manual review.");
+                        break;
+                    case ResumeStatementNode resumeStatement when !string.IsNullOrWhiteSpace(resumeStatement.TargetLabel):
+                        if (procedure.RequiresErrObject)
+                        {
+                            builder.AppendLine("__vb6Err = null;");
+                        }
+                        builder.AppendLine($"goto {resumeStatement.TargetLabel};");
+                        break;
+                    case ResumeStatementNode:
+                        manualReviewItems.Add("Resume requires manual review when no active 'On Error GoTo' handler is available.");
+                        builder.AppendLine("// TODO: Resume requires manual review.");
+                        break;
+                    case ExecutableStatementNode executableStatement:
+                        AppendExecutableStatement(builder, executableStatement.Text, inResumeNextScope, procedure.RequiresErrObject, indent: string.Empty, catchAction: null);
+                        break;
+                }
+            }
+        }
+
+        private static void AppendGoToHandlerProcedure(StringBuilder builder, ErrorHandlingProcedureNode procedure, List<string> manualReviewItems)
+        {
+            var handlerLabel = procedure.FirstGoToLabel!;
+            var handlerIndex = -1;
+            for (var i = 0; i < procedure.Statements.Count; i++)
+            {
+                if (procedure.Statements[i] is LabelStatementNode labelStatement && string.Equals(labelStatement.Label, handlerLabel, StringComparison.OrdinalIgnoreCase))
+                {
+                    handlerIndex = i;
+                    break;
+                }
+            }
+
+            if (handlerIndex < 0)
+            {
+                manualReviewItems.Add($"Handler label '{handlerLabel}' could not be located for exact Resume reconstruction.");
+                AppendLinearProcedure(builder, procedure, manualReviewItems);
+                return;
+            }
+
+            var protectedStatements = procedure.Statements.Take(handlerIndex).ToList();
+            var labelStateMap = BuildLabelStateMap(protectedStatements);
+            var afterProtectedState = protectedStatements.Count;
+
+            builder.AppendLine("int __vb6ResumeTarget = 0;");
+            builder.AppendLine("int __vb6ResumeNextTarget = 0;");
+            builder.AppendLine("int __vb6ErrorTarget = 0;");
+            builder.AppendLine("__vb6_dispatch:");
+            builder.AppendLine("switch (__vb6ResumeTarget)");
+            builder.AppendLine("{");
+
+            for (var i = 0; i < protectedStatements.Count; i++)
+            {
+                builder.AppendLine($"    case {i}:");
+                builder.AppendLine($"        goto __vb6_state_{i};");
+            }
+
+            builder.AppendLine($"    case {afterProtectedState}:");
+            builder.AppendLine("    default:");
+            builder.AppendLine("        goto __vb6_after_protected;");
+            builder.AppendLine("}");
+
+            var errorMode = ErrorHandlingMode.None;
+            for (var i = 0; i < protectedStatements.Count; i++)
+            {
+                var statement = protectedStatements[i];
+                var nextState = i + 1;
+
+                builder.AppendLine($"__vb6_state_{i}:");
+
+                switch (statement)
+                {
+                    case OnErrorResumeNextStatementNode:
+                        errorMode = ErrorHandlingMode.ResumeNext;
+                        break;
+                    case OnErrorGoToStatementNode goToStatement when string.Equals(goToStatement.Label, "0", StringComparison.OrdinalIgnoreCase):
+                        errorMode = ErrorHandlingMode.None;
+                        break;
+                    case OnErrorGoToStatementNode goToStatement:
+                        if (string.Equals(goToStatement.Label, handlerLabel, StringComparison.OrdinalIgnoreCase))
+                        {
+                            errorMode = ErrorHandlingMode.GoToHandler;
+                        }
+                        else
+                        {
+                            manualReviewItems.Add($"On Error GoTo {goToStatement.Label} is not the primary handler label and may require manual review.");
+                        }
+                        break;
+                    case LabelStatementNode labelStatement:
+                        builder.AppendLine($"{labelStatement.Label}:");
+                        break;
+                    case ExecutableStatementNode executableStatement:
+                        var catchAction = errorMode == ErrorHandlingMode.GoToHandler ? $"goto {handlerLabel};" : null;
+                        AppendExecutableStatement(builder, executableStatement.Text, errorMode == ErrorHandlingMode.ResumeNext || errorMode == ErrorHandlingMode.GoToHandler, procedure.RequiresErrObject, indent: string.Empty, catchAction, i, nextState);
+                        break;
+                    case ResumeNextStatementNode:
+                    case ResumeStatementNode:
+                        manualReviewItems.Add("Resume statements are expected inside the handler region; placement before the handler label requires manual review.");
+                        break;
+                }
+            }
+
+            builder.AppendLine("__vb6_after_protected:");
+
+            for (var i = handlerIndex; i < procedure.Statements.Count; i++)
+            {
+                switch (procedure.Statements[i])
+                {
+                    case LabelStatementNode labelStatement:
+                        builder.AppendLine($"{labelStatement.Label}:");
+                        break;
+                    case ResumeNextStatementNode:
+                        if (procedure.RequiresErrObject)
+                        {
+                            builder.AppendLine("__vb6Err = null;");
+                        }
+                        builder.AppendLine("__vb6ResumeTarget = __vb6ResumeNextTarget;");
+                        builder.AppendLine("goto __vb6_dispatch;");
+                        break;
+                    case ResumeStatementNode resumeStatement when string.IsNullOrWhiteSpace(resumeStatement.TargetLabel):
+                        if (procedure.RequiresErrObject)
+                        {
+                            builder.AppendLine("__vb6Err = null;");
+                        }
+                        builder.AppendLine("__vb6ResumeTarget = __vb6ErrorTarget;");
+                        builder.AppendLine("goto __vb6_dispatch;");
+                        break;
+                    case ResumeStatementNode resumeStatement:
+                        if (procedure.RequiresErrObject)
+                        {
+                            builder.AppendLine("__vb6Err = null;");
+                        }
+
+                        if (labelStateMap.TryGetValue(resumeStatement.TargetLabel!, out var state))
+                        {
+                            builder.AppendLine($"__vb6ResumeTarget = {state};");
+                            builder.AppendLine("goto __vb6_dispatch;");
+                        }
+                        else
+                        {
+                            builder.AppendLine($"goto {resumeStatement.TargetLabel};");
+                        }
+                        break;
+                    case ExecutableStatementNode executableStatement:
+                        builder.AppendLine(ConvertExecutableLine(executableStatement.Text));
+                        break;
+                    case OnErrorResumeNextStatementNode:
+                    case OnErrorGoToStatementNode:
+                        break;
+                }
+            }
+        }
+
+        private static Dictionary<string, int> BuildLabelStateMap(IReadOnlyList<ErrorHandlingStatementNode> statements)
+        {
+            var labelStateMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            for (var i = 0; i < statements.Count; i++)
+            {
+                if (statements[i] is LabelStatementNode labelStatement)
+                {
+                    labelStateMap[labelStatement.Label] = i;
+                }
+            }
+
+            return labelStateMap;
+        }
+
+        private static void AppendExecutableStatement(
+            StringBuilder builder,
+            string line,
+            bool wrapInTryCatch,
+            bool requiresErrObject,
+            string indent,
+            string? catchAction,
+            int? errorTarget = null,
+            int? resumeNextTarget = null)
+        {
+            var convertedLine = ConvertExecutableLine(line);
+
+            if (errorTarget.HasValue)
+            {
+                builder.AppendLine($"{indent}__vb6ErrorTarget = {errorTarget.Value};");
+            }
+
+            if (resumeNextTarget.HasValue)
+            {
+                builder.AppendLine($"{indent}__vb6ResumeNextTarget = {resumeNextTarget.Value};");
+            }
+
+            if (!wrapInTryCatch)
+            {
+                builder.AppendLine($"{indent}{convertedLine}");
+                return;
+            }
+
+            builder.AppendLine($"{indent}try");
+            builder.AppendLine($"{indent}{{");
+            builder.AppendLine($"{indent}    {convertedLine}");
+            builder.AppendLine($"{indent}}}");
+            builder.AppendLine($"{indent}catch (Exception ex)");
+            builder.AppendLine($"{indent}{{");
+            if (requiresErrObject)
+            {
+                builder.AppendLine($"{indent}    __vb6Err = Vb6RuntimeException.FromException(ex);");
+            }
+
+            if (!string.IsNullOrWhiteSpace(catchAction))
+            {
+                builder.AppendLine($"{indent}    {catchAction}");
+            }
+            else
+            {
+                builder.AppendLine($"{indent}    // VB6 'On Error Resume Next' ignored the failing statement.");
+            }
+            builder.AppendLine($"{indent}}}");
+        }
+
+        private static ErrorHandlingProcedureNode ParseProcedure(string vb6Code)
+        {
+            var procedure = new ErrorHandlingProcedureNode();
             var detectedPatterns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var requiresErrObject = false;
             string? firstGoToLabel = null;
@@ -158,8 +305,8 @@ namespace BLML.Phase2CoreLanguage.Converters
                 if (labelMatch.Success)
                 {
                     var label = labelMatch.Groups["label"].Value;
-                    labels.Add(label);
-                    statements.Add(new LabelStatement(label));
+                    procedure.Labels.Add(label);
+                    procedure.Statements.Add(new LabelStatementNode { Label = label });
                     continue;
                 }
 
@@ -168,25 +315,27 @@ namespace BLML.Phase2CoreLanguage.Converters
                 {
                     var label = goToMatch.Groups["label"].Value;
                     detectedPatterns.Add(label == "0" ? "On Error GoTo 0" : "On Error GoTo");
+                    requiresErrObject = true;
                     if (label != "0" && firstGoToLabel is null)
                     {
                         firstGoToLabel = label;
                     }
-                    statements.Add(new OnErrorGoToStatement(label));
+                    procedure.Statements.Add(new OnErrorGoToStatementNode { Label = label });
                     continue;
                 }
 
                 if (OnErrorResumeNextRegex.IsMatch(trimmed))
                 {
                     detectedPatterns.Add("On Error Resume Next");
-                    statements.Add(new OnErrorResumeNextStatement());
+                    requiresErrObject = true;
+                    procedure.Statements.Add(new OnErrorResumeNextStatementNode());
                     continue;
                 }
 
                 if (ResumeNextRegex.IsMatch(trimmed))
                 {
                     detectedPatterns.Add("Resume Next");
-                    statements.Add(new ResumeNextStatement());
+                    procedure.Statements.Add(new ResumeNextStatementNode());
                     continue;
                 }
 
@@ -194,7 +343,10 @@ namespace BLML.Phase2CoreLanguage.Converters
                 if (resumeMatch.Success)
                 {
                     detectedPatterns.Add("Resume");
-                    statements.Add(new ResumeStatement(resumeMatch.Groups["label"].Success ? resumeMatch.Groups["label"].Value : null));
+                    procedure.Statements.Add(new ResumeStatementNode
+                    {
+                        TargetLabel = resumeMatch.Groups["label"].Success ? resumeMatch.Groups["label"].Value : null
+                    });
                     continue;
                 }
 
@@ -203,15 +355,18 @@ namespace BLML.Phase2CoreLanguage.Converters
                     requiresErrObject = true;
                 }
 
-                statements.Add(new ExecutableStatement(trimmed));
+                procedure.Statements.Add(new ExecutableStatementNode { Text = trimmed });
             }
 
-            return new ErrorHandlingProcedure(
-                statements,
-                labels.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
-                detectedPatterns.ToArray(),
-                requiresErrObject,
-                firstGoToLabel);
+            procedure.RequiresErrObject = requiresErrObject;
+            procedure.FirstGoToLabel = firstGoToLabel;
+            procedure.DetectedPatterns.AddRange(detectedPatterns);
+
+            var distinctLabels = procedure.Labels.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            procedure.Labels.Clear();
+            procedure.Labels.AddRange(distinctLabels);
+
+            return procedure;
         }
 
         private static string ConvertExecutableLine(string line)
@@ -222,7 +377,7 @@ namespace BLML.Phase2CoreLanguage.Converters
                 var arguments = SplitArguments(errRaiseMatch.Groups["args"].Value);
                 var number = arguments.ElementAtOrDefault(0) ?? "0";
                 var source = arguments.ElementAtOrDefault(1) ?? "null";
-                var description = arguments.ElementAtOrDefault(2) ?? "$\"VB6 Err.Raise({number})\"";
+                var description = arguments.ElementAtOrDefault(2) ?? $"$\"VB6 Err.Raise({number})\"";
                 return $"throw new Vb6RuntimeException({number}, {source}, {description});";
             }
 
@@ -269,26 +424,12 @@ namespace BLML.Phase2CoreLanguage.Converters
             return text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
         }
 
-        private sealed record ErrorHandlingProcedure(
-            IReadOnlyList<ErrorHandlingStatement> Statements,
-            IReadOnlyList<string> Labels,
-            IReadOnlyList<string> DetectedPatterns,
-            bool RequiresErrObject,
-            string? FirstGoToLabel);
-
-        private abstract record ErrorHandlingStatement;
-
-        private sealed record OnErrorGoToStatement(string Label) : ErrorHandlingStatement;
-
-        private sealed record OnErrorResumeNextStatement : ErrorHandlingStatement;
-
-        private sealed record LabelStatement(string Label) : ErrorHandlingStatement;
-
-        private sealed record ResumeStatement(string? TargetLabel) : ErrorHandlingStatement;
-
-        private sealed record ResumeNextStatement : ErrorHandlingStatement;
-
-        private sealed record ExecutableStatement(string Text) : ErrorHandlingStatement;
+        private enum ErrorHandlingMode
+        {
+            None,
+            GoToHandler,
+            ResumeNext
+        }
     }
 
     public sealed class ErrorHandlingConversionResult

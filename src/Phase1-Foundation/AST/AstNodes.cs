@@ -164,6 +164,41 @@ namespace BLML.Phase1Foundation.AST
         public string ExitKind { get; set; } = string.Empty;
     }
 
+    public class ErrorHandlingProcedureNode : AstNode
+    {
+        public List<ErrorHandlingStatementNode> Statements { get; } = new List<ErrorHandlingStatementNode>();
+        public List<string> Labels { get; } = new List<string>();
+        public List<string> DetectedPatterns { get; } = new List<string>();
+        public bool RequiresErrObject { get; set; }
+        public string? FirstGoToLabel { get; set; }
+    }
+
+    public abstract class ErrorHandlingStatementNode : StatementNode { }
+
+    public class OnErrorGoToStatementNode : ErrorHandlingStatementNode
+    {
+        public string Label { get; set; } = string.Empty;
+    }
+
+    public class OnErrorResumeNextStatementNode : ErrorHandlingStatementNode { }
+
+    public class LabelStatementNode : ErrorHandlingStatementNode
+    {
+        public string Label { get; set; } = string.Empty;
+    }
+
+    public class ResumeStatementNode : ErrorHandlingStatementNode
+    {
+        public string? TargetLabel { get; set; }
+    }
+
+    public class ResumeNextStatementNode : ErrorHandlingStatementNode { }
+
+    public class ExecutableStatementNode : ErrorHandlingStatementNode
+    {
+        public string Text { get; set; } = string.Empty;
+    }
+
     // Array-related nodes
     public class ArrayAccessExpressionNode : ExpressionNode
     {

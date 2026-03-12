@@ -62,19 +62,28 @@ public class Phase2CoreLanguageTests
     }
 
     [Fact]
-    public void ErrorHandlingConverter_ShouldFlagResumeFlowsForManualReview()
+    public void ErrorHandlingConverter_ShouldReconstructResumeFlowsAgainstProtectedStatements()
     {
         var converter = new ErrorHandlingConverter();
         var result = converter.Convert("""
             On Error GoTo Handler
+            Call RiskyOperation()
+            Call NextStep()
+            Exit Sub
             Handler:
             Resume Next
+            Resume
             Resume Cleanup
             Cleanup:
             """);
 
-        Assert.Contains(result.ManualReviewItems, item => item.Contains("Resume Next", System.StringComparison.OrdinalIgnoreCase));
-        Assert.Contains("// TODO: Resume Next requires manual review.", result.CSharpCode);
+        Assert.DoesNotContain(result.ManualReviewItems, item => item.Contains("Resume", System.StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("int __vb6ResumeTarget = 0;", result.CSharpCode);
+        Assert.Contains("int __vb6ResumeNextTarget = 0;", result.CSharpCode);
+        Assert.Contains("int __vb6ErrorTarget = 0;", result.CSharpCode);
+        Assert.Contains("__vb6ResumeTarget = __vb6ResumeNextTarget;", result.CSharpCode);
+        Assert.Contains("__vb6ResumeTarget = __vb6ErrorTarget;", result.CSharpCode);
+        Assert.Contains("goto __vb6_dispatch;", result.CSharpCode);
         Assert.Contains("__vb6Err = null;", result.CSharpCode);
         Assert.Contains("goto Cleanup;", result.CSharpCode);
     }
