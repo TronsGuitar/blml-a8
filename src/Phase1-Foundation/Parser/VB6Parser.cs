@@ -9,6 +9,7 @@ namespace BLML.Phase1Foundation.Parser
     {
         private List<VB6Token> tokens = new List<VB6Token>();
         private int currentTokenIndex = 0;
+        private readonly Stack<HashSet<string>> localIdentifierScopes = new Stack<HashSet<string>>();
 
         public class TranspilerResult
         {
@@ -24,6 +25,7 @@ namespace BLML.Phase1Foundation.Parser
             try
             {
                 currentTokenIndex = 0;
+                localIdentifierScopes.Clear();
 
                 // Lexical analysis
                 var lexer = new VB6Lexer();
@@ -158,6 +160,8 @@ namespace BLML.Phase1Foundation.Parser
                 propertyNode.Attributes["Accessibility"] = accessibility;
             }
 
+            EnterLocalScope();
+            RegisterIdentifier(name);
             ParseParameters(propertyNode);
             if (Match("As"))
             {
@@ -165,6 +169,7 @@ namespace BLML.Phase1Foundation.Parser
             }
 
             ParseMethodBody(propertyNode, "Property");
+            ExitLocalScope();
             return propertyNode;
         }
 
@@ -315,6 +320,8 @@ namespace BLML.Phase1Foundation.Parser
                 funcNode.Attributes["Accessibility"] = accessibility;
             }
 
+            EnterLocalScope();
+            RegisterIdentifier(name);
             ParseParameters(funcNode);
             if (Match("As"))
             {
@@ -322,6 +329,7 @@ namespace BLML.Phase1Foundation.Parser
             }
 
             ParseMethodBody(funcNode, "Function");
+            ExitLocalScope();
             return funcNode;
         }
 
@@ -336,8 +344,11 @@ namespace BLML.Phase1Foundation.Parser
                 subNode.Attributes["Accessibility"] = accessibility;
             }
 
+            EnterLocalScope();
+            RegisterIdentifier(name);
             ParseParameters(subNode);
             ParseMethodBody(subNode, "Sub");
+            ExitLocalScope();
             return subNode;
         }
 
@@ -406,6 +417,7 @@ namespace BLML.Phase1Foundation.Parser
             }
 
             variableNode.Value = GetToken()?.Value ?? "UnnamedVariable";
+            RegisterIdentifier(variableNode.Value);
             variableNode.Attributes.TryAdd("Type", "Variant");
 
             if (Match("("))
@@ -511,7 +523,7 @@ namespace BLML.Phase1Foundation.Parser
                     return ParseExitStatement();
                 default:
                     // If it's an identifier followed by an equal sign, it's an assignment
-                    if (token.Type == BLML.Phase1Foundation.Lexer.TokenType.Identifier)
+                    if (IsIdentifierLike(token))
                     {
                         var next = tokens.ElementAtOrDefault(currentTokenIndex + 1);
                         if (next != null && next.Value == "=")
@@ -1061,6 +1073,48 @@ namespace BLML.Phase1Foundation.Parser
                 currentTokenIndex++;
                 return true;
             }
+            return false;
+        }
+
+        private void EnterLocalScope()
+        {
+            localIdentifierScopes.Push(new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+        }
+
+        private void ExitLocalScope()
+        {
+            if (localIdentifierScopes.Count > 0)
+            {
+                localIdentifierScopes.Pop();
+            }
+        }
+
+        private void RegisterIdentifier(string? identifier)
+        {
+            if (string.IsNullOrWhiteSpace(identifier) || localIdentifierScopes.Count == 0)
+            {
+                return;
+            }
+
+            localIdentifierScopes.Peek().Add(identifier);
+        }
+
+        private bool IsIdentifierLike(VB6Token token)
+        {
+            return token.Type == BLML.Phase1Foundation.Lexer.TokenType.Identifier ||
+                   (token.Type == BLML.Phase1Foundation.Lexer.TokenType.Keyword && IsLocallyDeclaredIdentifier(token.Value));
+        }
+
+        private bool IsLocallyDeclaredIdentifier(string identifier)
+        {
+            foreach (var scope in localIdentifierScopes)
+            {
+                if (scope.Contains(identifier))
+                {
+                    return true;
+                }
+            }
+
             return false;
         }
     }
