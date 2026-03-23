@@ -1,16 +1,38 @@
+using System;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
 namespace BLML.Phase4DataAccess.ADO
 {
     public class AdoConverter
     {
-        /* TODO: Implementation Logic
-         * 1. Map ADODB.Connection to SqlConnection or DbConnection.
-         * 2. Map ADODB.Recordset usage to ADO.NET DataTable, DataReader, or List<T>.
-         * 3. Convert SQL query strings from Access-SQL dialect to T-SQL or LINQ.
-         * 4. Handle specialized ADO features like Client-side cursors and Batch updates.
-         * 5. Replace 'Recordset.Fields' access with strongly-typed property access.
-         */
-        public AdoConverter()
+        // Converts ADODB.Connection, Recordset to System.Data.SqlClient equivalents
+
+        public StatementSyntax ConvertConnectionOpen(string connectionString)
         {
+            // ADODB: cn.Open "..."
+            // C#: using (var cn = new SqlConnection("...")) { cn.Open(); ... }
+            
+            return SyntaxFactory.ParseStatement($"var connection = new System.Data.SqlClient.SqlConnection({connectionString}); connection.Open();");
+        }
+
+        public StatementSyntax ConvertRecordsetOpen(string sql, string connectionVar)
+        {
+            // ADODB: rs.Open sql, cn
+            // C#: var command = new SqlCommand(sql, connection); var reader = command.ExecuteReader();
+
+            var block = SyntaxFactory.Block(
+                SyntaxFactory.ParseStatement($"var command = new System.Data.SqlClient.SqlCommand({sql}, {connectionVar});"),
+                SyntaxFactory.ParseStatement($"var reader = command.ExecuteReader();")
+            );
+            return block;
+        }
+
+        public StatementSyntax ConvertRecordsetLoop()
+        {
+            // ADODB: Do Until rs.EOF ... rs.MoveNext Loop
+            // C#: while (reader.Read()) { ... }
+            return SyntaxFactory.ParseStatement("while (reader.Read()) { /* body */ }");
         }
     }
 }

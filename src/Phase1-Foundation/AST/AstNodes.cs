@@ -212,4 +212,18 @@ namespace BLML.Phase1Foundation.AST
         public bool Preserve { get; set; }
         public List<ExpressionNode> NewDimensions { get; } = new List<ExpressionNode>();
     }
+
+    // Error Handling Nodes
+    public class OnErrorStatementNode : StatementNode
+    {
+        public bool IsResumeNext { get; set; } // On Error Resume Next
+        public bool IsGoTo0 { get; set; }      // On Error GoTo 0
+        public string LabelName { get; set; }  // On Error GoTo Label
+    }
+
+    public class ResumeStatementNode : StatementNode
+    {
+        public bool IsNext { get; set; }       // Resume Next
+        public string LabelName { get; set; }  // Resume Label
+    }
 }

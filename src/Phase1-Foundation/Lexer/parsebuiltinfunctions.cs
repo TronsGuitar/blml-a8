@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
 public class BuiltInFunctionsParser
@@ -51,7 +53,6 @@ public class BuiltInFunctionsParser
         foreach (var functionName in BuiltInFunctions.Keys)
         {
             string pattern = $@"\b{functionName}\s*\((.*?)\)";
-
             var match = Regex.Match(expression, pattern, RegexOptions.IgnoreCase);
 
             if (match.Success)
