@@ -221,7 +221,7 @@ namespace BLML.Phase1Foundation.AST
         public string LabelName { get; set; }  // On Error GoTo Label
     }
 
-    public class ResumeStatementNode : StatementNode
+    public class SimpleResumeStatementNode : StatementNode
     {
         public bool IsNext { get; set; }       // Resume Next
         public string LabelName { get; set; }  // Resume Label

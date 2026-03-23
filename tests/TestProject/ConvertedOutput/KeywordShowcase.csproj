@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>KeywordShowcase</AssemblyName>
+    <RootNamespace>KeywordShowcase</RootNamespace>
+    <WarningLevel>0</WarningLevel>
+    <AnalysisLevel>none</AnalysisLevel>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- VB6 Reference: OLE Automation (GUID: {00020430-0000-0000-C000-000000000046}) -->
+    <!-- VB6 Reference: Microsoft Scripting Runtime (GUID: {420B2830-E718-11CF-893D-00A0C9054228}) -->
+  </ItemGroup>
+</Project>

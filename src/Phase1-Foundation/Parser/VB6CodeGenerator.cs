@@ -9,7 +9,7 @@ namespace BLML.Phase1Foundation.Parser
 {
     public class VB6CodeGenerator
     {
-        public string GenerateCSharpCode(ModuleNode module)
+        public string GenerateCSharpCode(ModuleNode module, BLML.Phase1Foundation.ProjectModel.VB6Project project = null)
         {
             if (module == null) return string.Empty;
 
@@ -17,23 +17,18 @@ namespace BLML.Phase1Foundation.Parser
                 .AddReferences(MetadataReference.CreateFromFile(typeof(object).Assembly.Location));
 
             var syntaxTree = CSharpSyntaxTree.Create(
-                GenerateCompilationUnit(module).NormalizeWhitespace()
+                GenerateCompilationUnit(module, project).NormalizeWhitespace()
             );
 
             return syntaxTree.ToString();
         }
 
-        private CompilationUnitSyntax GenerateCompilationUnit(ModuleNode module)
+        private CompilationUnitSyntax GenerateCompilationUnit(ModuleNode module, BLML.Phase1Foundation.ProjectModel.VB6Project project = null)
         {
-            var usings = new List<UsingDirectiveSyntax>
-            {
-                SyntaxFactory.UsingDirective(SyntaxFactory.ParseName("System"))
-            };
-
-            var members = new List<MemberDeclarationSyntax>();
+            var usings = BLML.Phase1Foundation.ProjectModel.NamespaceAndUsingGenerator.GenerateUsings(project, true);
 
             // In C#, we usually wrap logic in a class
-            var classDecl = SyntaxFactory.ClassDeclaration(module.Name)
+            var classDecl = SyntaxFactory.ClassDeclaration(string.IsNullOrWhiteSpace(module.Name) ? "GeneratedModule" : module.Name)
                 .AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword), SyntaxFactory.Token(SyntaxKind.PartialKeyword));
 
             foreach (var member in GenerateMembers(module.Declarations))
@@ -41,11 +36,11 @@ namespace BLML.Phase1Foundation.Parser
                 classDecl = classDecl.AddMembers(member);
             }
 
-            members.Add(classDecl);
+            var namespaceDecl = BLML.Phase1Foundation.ProjectModel.NamespaceAndUsingGenerator.WrapInNamespace(project?.Name, classDecl);
 
             return SyntaxFactory.CompilationUnit()
                 .AddUsings(usings.ToArray())
-                .AddMembers(members.ToArray());
+                .AddMembers(namespaceDecl);
         }
 
         private IEnumerable<MemberDeclarationSyntax> GenerateMembers(IReadOnlyList<DeclarationNode> declarations)

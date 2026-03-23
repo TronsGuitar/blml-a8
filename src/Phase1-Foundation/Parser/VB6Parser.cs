@@ -69,10 +69,16 @@ namespace BLML.Phase1Foundation.Parser
 
             while (currentTokenIndex < tokens.Count)
             {
+                int prevIndex = currentTokenIndex;
                 var declaration = ParseDeclaration();
                 if (declaration != null)
                 {
                     moduleNode.Children.Add(declaration);
+                }
+
+                if (currentTokenIndex == prevIndex)
+                {
+                    throw new Exception($"Infinite loop detected at token '{tokens[currentTokenIndex].Value}' (Line {tokens[currentTokenIndex].Line}, Index {currentTokenIndex})! ParseDeclaration did not consume any tokens.");
                 }
             }
 
@@ -96,6 +102,12 @@ namespace BLML.Phase1Foundation.Parser
                     return ParseSub();
                 case "property":
                     return ParseProperty();
+                case "version":
+                    return ParseVersion();
+                case "begin":
+                    return ParseBeginBlock();
+                case "attribute":
+                    return ParseAttribute();
                 case "dim":
                 case "private":
                 case "public":
@@ -161,6 +173,135 @@ namespace BLML.Phase1Foundation.Parser
             SkipToken(); // Skip 'Class'
             var name = GetToken()?.Value ?? "UnknownClass";
             return new VB6SyntaxNode { Type = NodeType.Class, Value = name };
+        }
+
+        private VB6SyntaxNode ParseVersion()
+        {
+            var versionToken = PeekToken();
+            var line = versionToken?.Line ?? 0;
+            SkipToken(); // Skip 'VERSION'
+
+            var versionNode = new VB6SyntaxNode { Type = NodeType.Statement, Value = "VERSION" };
+
+            var text = "";
+            while (PeekToken() != null && PeekToken().Line == line)
+            {
+                text += GetToken()?.Value;
+            }
+            versionNode.Attributes["Content"] = text;
+
+            return versionNode;
+        }
+
+        private VB6SyntaxNode ParseBeginBlock()
+        {
+            var beginToken = PeekToken();
+            var line = beginToken?.Line ?? 0;
+            SkipToken(); // Skip 'Begin'
+
+            var beginNode = new VB6SyntaxNode { Type = NodeType.Statement, Value = "BeginBlock" };
+
+            var controlInfo = "";
+            while (PeekToken() != null && PeekToken().Line == line)
+            {
+                var t = GetToken();
+                if (t != null) controlInfo += t.Value;
+            }
+            beginNode.Attributes["Control"] = controlInfo;
+
+            while (PeekToken() != null)
+            {
+                if (PeekToken().Value.Equals("End", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Check if this End belongs to a begin block. In forms, End indicates close of block.
+                    // Also form property assignments don't use 'End'.
+                    var endLine = PeekToken().Line;
+                    SkipToken(); // Consume End
+                    
+                    // Consume any extra tokens on End line
+                    while (PeekToken() != null && PeekToken().Line == endLine)
+                    {
+                        SkipToken();
+                    }
+                    break;
+                }
+                else if (PeekToken().Value.Equals("Begin", StringComparison.OrdinalIgnoreCase))
+                {
+                    beginNode.Children.Add(ParseBeginBlock());
+                }
+                else
+                {
+                    var propAssign = ParseFormProperty();
+                    if (propAssign != null) beginNode.Children.Add(propAssign);
+                }
+            }
+
+            return beginNode;
+        }
+
+        private VB6SyntaxNode ParseFormProperty()
+        {
+            var token = PeekToken();
+            if (token == null) return null;
+
+            var propNode = new VB6SyntaxNode { Type = NodeType.Statement, Value = "FormProperty" };
+            var line = token.Line;
+
+            var leftSide = "";
+            var rightSide = "";
+            bool isRight = false;
+
+            while (PeekToken() != null && PeekToken().Line == line)
+            {
+                var t = GetToken();
+                if (t == null) break;
+
+                if (!isRight && t.Value == "=")
+                {
+                    isRight = true;
+                    continue;
+                }
+
+                if (isRight) rightSide += t.Type == BLML.Phase1Foundation.Lexer.TokenType.StringLiteral ? $"\"{t.Value}\"" : t.Value;
+                else leftSide += t.Value;
+            }
+
+            propNode.Attributes["Property"] = leftSide.Trim();
+            propNode.Attributes["Value"] = rightSide.Trim();
+            return propNode;
+        }
+
+        private VB6SyntaxNode ParseAttribute()
+        {
+            var attrToken = PeekToken();
+            var line = attrToken?.Line ?? 0;
+            SkipToken(); // Skip 'Attribute'
+
+            var attrNode = new VB6SyntaxNode { Type = NodeType.Statement, Value = "Attribute" };
+
+            var leftSide = "";
+            var rightSide = "";
+            bool isRight = false;
+
+            while (PeekToken() != null && PeekToken().Line == line)
+            {
+                var t = GetToken();
+                if (t == null) break;
+
+                if (!isRight && t.Value == "=")
+                {
+                    isRight = true;
+                    continue;
+                }
+
+                if (isRight) rightSide += t.Type == BLML.Phase1Foundation.Lexer.TokenType.StringLiteral ? $"\"{t.Value}\"" : t.Value;
+                else leftSide += t.Value;
+            }
+
+            attrNode.Attributes["Property"] = leftSide.Trim();
+            attrNode.Attributes["Value"] = rightSide.Trim();
+
+            return attrNode;
         }
 
         private VB6SyntaxNode ParseFunction(string? accessibility = null)
@@ -272,13 +413,17 @@ namespace BLML.Phase1Foundation.Parser
                 variableNode.Attributes["IsArray"] = "true";
                 while (PeekToken() != null && !Match(")"))
                 {
+                    int prevIdx = currentTokenIndex;
                     var dimension = ParseExpression();
                     if (dimension != null)
                     {
                         variableNode.Children.Add(dimension);
                     }
 
-                    Match(",");
+                    if (!Match(",") && currentTokenIndex == prevIdx)
+                    {
+                        SkipToken(); // Safety: skip unrecognized token to prevent infinite loop
+                    }
                 }
             }
 
@@ -312,6 +457,7 @@ namespace BLML.Phase1Foundation.Parser
         {
             while (PeekToken() != null)
             {
+                int prevIndex = currentTokenIndex;
                 if (PeekToken().Value.Equals("End", StringComparison.OrdinalIgnoreCase))
                 {
                     var next = tokens.ElementAtOrDefault(currentTokenIndex + 1);
@@ -325,6 +471,11 @@ namespace BLML.Phase1Foundation.Parser
 
                 var statement = ParseStatement();
                 if (statement != null) methodNode.Children.Add(statement);
+
+                if (currentTokenIndex == prevIndex)
+                {
+                    throw new Exception($"Infinite loop detected in ParseMethodBody ({endKeyword}) at token '{tokens[currentTokenIndex].Value}' (Line {tokens[currentTokenIndex].Line}, Index {currentTokenIndex})! ParseStatement did not consume any tokens.");
+                }
             }
         }
 
@@ -755,6 +906,30 @@ namespace BLML.Phase1Foundation.Parser
 #pragma warning restore CS8603 // Possible null reference return.
             }
 
+            // Handle unary operators: -, Not
+            if (token.Value == "-" || token.Value.Equals("Not", StringComparison.OrdinalIgnoreCase))
+            {
+                SkipToken(); // Consume the unary operator
+                var operand = ParsePrimaryExpression();
+                if (operand == null)
+                {
+                    // Unary operator with no operand — return as standalone expression
+                    return new VB6SyntaxNode
+                    {
+                        Type = NodeType.Expression,
+                        Value = token.Value,
+                        Attributes = new Dictionary<string, string> { ["ExpressionKind"] = "UnaryOperator" }
+                    };
+                }
+                return new VB6SyntaxNode
+                {
+                    Type = NodeType.Expression,
+                    Value = token.Value,
+                    Attributes = new Dictionary<string, string> { ["ExpressionKind"] = "UnaryOperator" },
+                    Children = { operand }
+                };
+            }
+
             if (Match("("))
             {
                 var expression = ParseExpression();
@@ -811,13 +986,17 @@ namespace BLML.Phase1Foundation.Parser
                     expressionNode.Attributes["ExpressionKind"] = "Invocation";
                     while (PeekToken() != null && !Match(")"))
                     {
+                        int prevIdx = currentTokenIndex;
                         var argument = ParseExpression();
                         if (argument != null)
                         {
                             expressionNode.Children.Add(argument);
                         }
 
-                        Match(",");
+                        if (!Match(",") && currentTokenIndex == prevIdx)
+                        {
+                            SkipToken(); // Safety: skip unrecognized token to prevent infinite loop
+                        }
                     }
                 }
 
