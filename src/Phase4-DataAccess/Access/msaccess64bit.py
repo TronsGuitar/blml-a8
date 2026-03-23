@@ -3,22 +3,15 @@
 Access64Driver - A simple driver for MS Access 2007 MDB files using the ACE OLEDB provider.
 This driver provides functionality similar to the Microsoft Jet Driver while working in 64-bit mode.
 You must have the Microsoft Access Database Engine (2010 Redistributable or later) installed.
-
-Usage:
-    driver = Access64Driver("path_to_file.mdb")
-    driver.connect()
-    results = driver.execute("SELECT * FROM SomeTable")
-    for row in results:
-        print(row)
-    driver.close()
 """
 
 from pathlib import Path
 import sys
+import json
 
 try:
     import pyodbc  # type: ignore
-except ImportError:  # pragma: no cover - covered indirectly through injected test doubles
+except ImportError:
     pyodbc = None
 
 
@@ -73,6 +66,30 @@ class Access64Driver:
         self._ensure_connected()
         return [table.table_name for table in self.cursor.tables() if table.table_type == "TABLE"]
 
+    def get_table_schema(self, table_name):
+        self._ensure_connected()
+        columns = []
+        for col in self.cursor.columns(table=table_name):
+            columns.append({
+                "name": col.column_name,
+                "type": col.type_name,
+                "nullable": col.nullable == 1,
+                "length": col.column_size
+            })
+        
+        pks = []
+        try:
+            for pk in self.cursor.primaryKeys(table=table_name):
+                pks.append(pk.column_name)
+        except:
+            pass
+            
+        return {
+            "name": table_name,
+            "columns": columns,
+            "primary_keys": pks
+        }
+
     def commit(self):
         if self.conn:
             self.conn.commit()
@@ -98,15 +115,17 @@ class Access64Driver:
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python access_driver.py <mdb_file_path>")
+        print(json.dumps({"error": "Usage: msaccess64bit.py <mdb_file_path> [table_name]"}))
         sys.exit(1)
 
     mdb_file = sys.argv[1]
     try:
         with Access64Driver(mdb_file) as driver:
-            print("Successfully connected to", mdb_file)
-            print("Tables in the database:")
-            for table_name in driver.list_tables():
-                print(" -", table_name)
+            if len(sys.argv) > 2:
+                schema = driver.get_table_schema(sys.argv[2])
+                print(json.dumps(schema, indent=2))
+            else:
+                all_schemas = [driver.get_table_schema(t) for t in driver.list_tables()]
+                print(json.dumps(all_schemas, indent=2))
     except Exception as e:
-        print("An error occurred:", e)
+        print(json.dumps({"error": str(e)}))

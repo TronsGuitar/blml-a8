@@ -27,6 +27,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="Phase4-DataAccess\Models\*.cs" />
+    <Compile Include="Phase4-DataAccess\Access\SchemaExtractor.cs" />
     <Compile Include="Phase4-DataAccess\ADO\AdoConverter.cs" />
     <Compile Include="Phase4-DataAccess\EntityFramework\DbContextGenerator.cs" />
     <Compile Include="Phase4-DataAccess\EntityFramework\EntityGenerator.cs" />

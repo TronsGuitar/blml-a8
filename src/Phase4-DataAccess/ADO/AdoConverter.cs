@@ -34,5 +34,26 @@ namespace BLML.Phase4DataAccess.ADO
             // C#: while (reader.Read()) { ... }
             return SyntaxFactory.ParseStatement("while (reader.Read()) { /* body */ }");
         }
+
+        public ExpressionSyntax ConvertFieldValue(string rsVar, string fieldName)
+        {
+            // ADODB: rs.Fields("Name").Value
+            // C#: reader["Name"]
+            return SyntaxFactory.ParseExpression($"{rsVar}[\"{fieldName}\"]");
+        }
+
+        public StatementSyntax ConvertMoveNext(string rsVar)
+        {
+            // ADODB: rs.MoveNext
+            // C#: // Handled by while(reader.Read()) loop
+            return SyntaxFactory.ParseStatement("// rs.MoveNext handled by Read() loop");
+        }
+
+        public StatementSyntax ConvertClose(string connectionVar)
+        {
+            // ADODB: cn.Close
+            // C#: connection.Close();
+            return SyntaxFactory.ParseStatement($"{connectionVar}.Close();");
+        }
     }
 }
