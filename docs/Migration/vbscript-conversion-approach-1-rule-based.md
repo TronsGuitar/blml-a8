@@ -344,7 +344,6 @@ class Program
 {
     static void Main(string[] args)
     {
-        var objFSO = default(object);
         dynamic objFSO = Activator.CreateInstance(Type.GetTypeFromProgID("Scripting.FileSystemObject"));
         var sPath = default(object);
         sPath = "C:\\Logs\\app.log";

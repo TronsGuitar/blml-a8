@@ -507,7 +507,7 @@ class Program
     {
         dynamic /*WShell*/ oShell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell"));
         dynamic i = null;
-        for (dynamic i = 1; i <= 5; i++)
+        for (i = 1; i <= 5; i++)
         {
             oShell.Run("cmd /c echo Line " + i);
         }
