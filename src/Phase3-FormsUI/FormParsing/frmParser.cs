@@ -131,7 +131,16 @@ public static class FrmParser
 
     public static void ParseAndConvertToCSharp(string inputFilePath, string outputFilePath)
     {
-        FrmxGenerator.ConvertFile(inputFilePath, outputFilePath);
+        var form = ParseFile(inputFilePath);
+        var converted = ConvertToIntermediateFormat(form);
+
+        var outputDirectory = Path.GetDirectoryName(outputFilePath);
+        if (!string.IsNullOrEmpty(outputDirectory))
+        {
+            Directory.CreateDirectory(outputDirectory);
+        }
+
+        File.WriteAllText(outputFilePath, converted);
     }
 
     public static string MapToCSharpControlType(string vb6Type)

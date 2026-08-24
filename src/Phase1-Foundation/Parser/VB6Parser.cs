@@ -55,7 +55,8 @@ namespace BLML.Phase1Foundation.Parser
             }
             catch (Exception ex)
             {
-                result.Errors.Add($"Transpilation failed: {ex.Message}");
+                // Capture full exception details including stack trace to aid debugging
+                result.Errors.Add($"Transpilation failed: {ex}");
             }
 
             return result;

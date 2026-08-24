@@ -201,5 +201,65 @@ namespace BLML.Phase3FormsUI.Layout
             public string Name { get; set; }
             public Dictionary<string, string> Properties { get; } = new Dictionary<string, string>();
         }
+
+        public class RowPlan
+        {
+            public List<Row> Rows { get; } = new List<Row>();
+
+            public class Row
+            {
+                public string[] ControlNames { get; set; } = Array.Empty<string>();
+            }
+        }
+
+        public List<RowPlan.Row> BuildRowPlan(IEnumerable<BLML.Phase3FormsUI.Models.Vb6ControlDefinition> controls)
+        {
+            var list = new List<(int Top, string Name)>();
+            foreach (var c in controls)
+            {
+                if (c.Properties.TryGetValue("Top", out var topStr) && int.TryParse(topStr, out var top))
+                {
+                    var px = ConvertTwipsToPixels(top);
+                    list.Add((px, c.Name));
+                }
+                else
+                {
+                    list.Add((0, c.Name));
+                }
+            }
+
+            var rows = new List<RowPlan.Row>();
+            // group by approximate top coordinate
+            list = list.OrderBy(i => i.Top).ToList();
+            int? currentTop = null;
+            var currentRow = new List<string>();
+            const int threshold = 20; // pixels
+            foreach (var item in list)
+            {
+                if (currentTop == null)
+                {
+                    currentTop = item.Top;
+                    currentRow.Add(item.Name);
+                    continue;
+                }
+                if (Math.Abs(item.Top - currentTop.Value) <= threshold)
+                {
+                    currentRow.Add(item.Name);
+                }
+                else
+                {
+                    rows.Add(new RowPlan.Row { ControlNames = currentRow.ToArray() });
+                    currentRow = new List<string> { item.Name };
+                    currentTop = item.Top;
+                }
+            }
+            if (currentRow.Count > 0) rows.Add(new RowPlan.Row { ControlNames = currentRow.ToArray() });
+            return rows;
+        }
+
+        public int ConvertTwipsToPixels(int twips)
+        {
+            return (int)(twips / TwipsPerPixelX);
+        }
     }
 }

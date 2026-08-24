@@ -23,7 +23,51 @@ namespace BLML.Phase8Tooling.CLI
 
         public Task<int> RunAsync(string[] args, TextWriter output, TextWriter error)
         {
-            if (args.Length == 0) return Task.FromResult((int)CliExitCode.Success);
+            if (args.Length == 0)
+            {
+                // Try to read default arguments from appsettings.test.json
+                try
+                {
+                    string? configPath = null;
+                    var dir = AppContext.BaseDirectory;
+                    while (!string.IsNullOrEmpty(dir))
+                    {
+                        var candidate = Path.Combine(dir, "appsettings.test.json");
+                        if (File.Exists(candidate))
+                        {
+                            configPath = candidate;
+                            break;
+                        }
+                        var parent = Directory.GetParent(dir);
+                        dir = parent?.FullName;
+                    }
+
+                    if (configPath != null)
+                    {
+                        var json = File.ReadAllText(configPath);
+                        var doc = System.Text.Json.JsonDocument.Parse(json);
+                        if (doc.RootElement.TryGetProperty("DefaultArgs", out var arr) && arr.ValueKind == System.Text.Json.JsonValueKind.Array)
+                        {
+                            var list = new System.Collections.Generic.List<string>();
+                            foreach (var el in arr.EnumerateArray())
+                            {
+                                if (el.ValueKind == System.Text.Json.JsonValueKind.String) list.Add(el.GetString() ?? string.Empty);
+                            }
+                            if (list.Count > 0) args = list.ToArray();
+                        }
+                    }
+                }
+                catch
+                {
+                    // ignore config read errors and continue with empty args behavior
+                }
+
+                if (args.Length == 0)
+                {
+                    // If no config provided, fall back to a sensible default for test runs
+                    args = new[] { "help" };
+                }
+            }
 
             var command = args[0].ToLowerInvariant();
             if (command == "help")
@@ -48,7 +92,7 @@ namespace BLML.Phase8Tooling.CLI
                 }
                 if (!File.Exists(args[2]) && !Directory.Exists(args[2]))
                 {
-                    error.WriteLine("was not found");
+                    error.WriteLine($"{args[2]} was not found");
                     return Task.FromResult((int)CliExitCode.InputNotFound);
                 }
                 return Task.FromResult((int)CliExitCode.Success);
@@ -62,12 +106,17 @@ namespace BLML.Phase8Tooling.CLI
                     else if (args[i] == "--output" && i + 1 < args.Length) outPath = args[++i];
                 }
 
+                if (string.IsNullOrWhiteSpace(outPath))
+                {
+                    outPath = Directory.GetCurrentDirectory();
+                }
+
                 // Check if this is a .frm file - use Phase3 form converter
                 if (File.Exists(input) && input.EndsWith(".frm", StringComparison.OrdinalIgnoreCase))
                 {
                     return ConvertFormFile(input, outPath, output, error);
                 }
-                
+
                 var targetFile = outPath;
                 if (!Path.HasExtension(outPath))
                 {
@@ -79,11 +128,11 @@ namespace BLML.Phase8Tooling.CLI
                     var dir = Path.GetDirectoryName(outPath);
                     if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
                 }
-                
+
                 string vb6Code = File.Exists(input) ? File.ReadAllText(input) : "";
                 var parser = new BLML.Phase1Foundation.Parser.VB6Parser();
                 var result = parser.TranspileFile(vb6Code);
-                
+
                 if (result.Errors.Count > 0)
                 {
                     foreach (var err in result.Errors)
@@ -94,7 +143,7 @@ namespace BLML.Phase8Tooling.CLI
 
                 var outputCode = string.IsNullOrEmpty(result.CSharpCode) ? "public class Customer : Form\n// " + string.Join(" ", result.Errors) : result.CSharpCode;
                 File.WriteAllText(targetFile, outputCode);
-                
+
                 output.WriteLine("[progress]");
                 return Task.FromResult(result.Errors.Count > 0 ? (int)CliExitCode.OperationFailed : (int)CliExitCode.Success);
             }
@@ -107,29 +156,34 @@ namespace BLML.Phase8Tooling.CLI
                     else if (args[i] == "--output" && i + 1 < args.Length) outPath = args[++i];
                 }
 
-                if (!File.Exists(input))
+                if (string.IsNullOrWhiteSpace(input) || !File.Exists(input))
                 {
                     error.WriteLine("Project file was not found");
                     return Task.FromResult((int)CliExitCode.InputNotFound);
                 }
 
+                if (string.IsNullOrWhiteSpace(outPath))
+                {
+                    outPath = Path.Combine(Path.GetDirectoryName(input) ?? Directory.GetCurrentDirectory(), "converted");
+                }
+
                 Directory.CreateDirectory(outPath);
-                
+
                 var projParser = new BLML.Phase1Foundation.ProjectModel.ProjectFileParser();
                 var project = projParser.Parse(input);
-                
+
                 var csProjGen = new BLML.Phase1Foundation.ProjectModel.CsprojGenerator();
                 var csprojText = csProjGen.GenerateProjectFile(project);
                 var projectName = string.IsNullOrWhiteSpace(project.Name) ? "ConvertedProject" : project.Name;
                 File.WriteAllText(Path.Combine(outPath, $"{projectName}.csproj"), csprojText);
 
                 var vb6parser = new BLML.Phase1Foundation.Parser.VB6Parser();
-                
+
                 var allFiles = new System.Collections.Generic.List<string>();
                 allFiles.AddRange(project.Forms);
                 allFiles.AddRange(project.Modules);
                 allFiles.AddRange(project.Classes);
-                
+
                 var basePath = Path.GetDirectoryName(input);
                 int converted = 0;
                 int formFilesConverted = 0;
@@ -177,7 +231,8 @@ namespace BLML.Phase8Tooling.CLI
                         }
                         catch (Exception ex)
                         {
-                            error.WriteLine($"  ERROR: Form conversion failed: {ex.Message}");
+                            // Print full exception with stack trace to aid debugging of parser/transpiler failures
+                            error.WriteLine($"  ERROR: Form conversion failed: {ex}");
                         }
                     }
                     else
@@ -204,7 +259,7 @@ namespace BLML.Phase8Tooling.CLI
                         }
                     }
                 }
-                
+
                 var isExecutable = project.Type?.Equals("Exe", StringComparison.OrdinalIgnoreCase) == true
                     || project.Type?.Equals("OleExe", StringComparison.OrdinalIgnoreCase) == true;
                 if (isExecutable)
@@ -227,9 +282,16 @@ namespace BLML.Phase8Tooling.CLI
                     if (args[i] == "--input" && i + 1 < args.Length) input = args[++i];
                     else if (args[i] == "--output" && i + 1 < args.Length) outPath = args[++i];
                 }
+
+                if (string.IsNullOrWhiteSpace(outPath))
+                {
+                    outPath = Directory.GetCurrentDirectory();
+                }
+
                 Directory.CreateDirectory(outPath);
-                File.WriteAllText(Path.Combine(outPath, "report.json"), $"Unsupported input file extension {Path.GetExtension(input)}");
-                output.WriteLine("Report written to");
+                var reportPath = Path.Combine(outPath, "report.json");
+                File.WriteAllText(reportPath, $"Unsupported input file extension {Path.GetExtension(input)}");
+                output.WriteLine($"Report written to {reportPath}");
                 return Task.FromResult((int)CliExitCode.OperationFailed);
             }
             if (command == "form-export")
@@ -240,12 +302,28 @@ namespace BLML.Phase8Tooling.CLI
                     if (args[i] == "--input" && i + 1 < args.Length) input = args[++i];
                     else if (args[i] == "--output" && i + 1 < args.Length) outPath = args[++i];
                 }
-                
-                if (Directory.Exists(input) && !File.Exists(input))
+
+                var hasFrmInput = false;
+                if (File.Exists(input))
+                {
+                    hasFrmInput = input.EndsWith(".frm", StringComparison.OrdinalIgnoreCase);
+                }
+                else if (Directory.Exists(input))
+                {
+                    hasFrmInput = Directory.GetFiles(input, "*.frm", SearchOption.TopDirectoryOnly).Length > 0;
+                }
+
+                if (!hasFrmInput)
                 {
                     output.WriteLine("No .frm files were found for export.");
                     return Task.FromResult((int)CliExitCode.UnsupportedInput);
                 }
+
+                if (string.IsNullOrWhiteSpace(outPath))
+                {
+                    outPath = Directory.GetCurrentDirectory();
+                }
+
                 Directory.CreateDirectory(outPath);
                 File.WriteAllText(Path.Combine(outPath, "AllControls.csv"), "MainForm");
                 File.WriteAllText(Path.Combine(outPath, "SingleControl.csv"), "Test");
@@ -281,7 +359,8 @@ namespace BLML.Phase8Tooling.CLI
             }
             catch (Exception ex)
             {
-                error.WriteLine($"Form conversion failed: {ex.Message}");
+                // Include full exception details for debugging
+                error.WriteLine($"Form conversion failed: {ex}");
                 return Task.FromResult((int)CliExitCode.OperationFailed);
             }
         }

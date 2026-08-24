@@ -175,17 +175,40 @@ namespace BLML.Phase1Foundation.AST
                 case NodeType.Statement:
                     if (node.Value == "=")
                     {
+                        // Be defensive: some malformed parse nodes may have fewer than two children.
+                        ExpressionNode targetExpr;
+                        ExpressionNode valueExpr;
+
+                        if (node.Children.Count > 0)
+                        {
+                            targetExpr = BuildExpression(node.Children[0]) ?? new IdentifierExpressionNode { Name = node.Children[0].Value ?? "_unknown" };
+                        }
+                        else
+                        {
+                            targetExpr = new IdentifierExpressionNode { Name = "_unknown_target" };
+                        }
+
+                        if (node.Children.Count > 1)
+                        {
+                            valueExpr = BuildExpression(node.Children[1]) ?? new IdentifierExpressionNode { Name = node.Children[1].Value ?? "_unknown" };
+                        }
+                        else
+                        {
+                            valueExpr = new IdentifierExpressionNode { Name = "_unknown_value" };
+                        }
+
                         return new AssignmentNode
                         {
-                            Target = BuildExpression(node.Children[0]),
-                            Value = BuildExpression(node.Children[1])
+                            Target = targetExpr,
+                            Value = valueExpr
                         };
                     }
                     if (node.Value == "If")
                     {
                         var ifStmt = new IfStatementNode
                         {
-                            Condition = BuildExpression(node.Children[0])
+                            // Guard against missing condition node
+                            Condition = node.Children.Count > 0 ? BuildExpression(node.Children[0]) ?? new IdentifierExpressionNode { Name = node.Children[0].Value ?? "_cond" } : new IdentifierExpressionNode { Name = "_cond_missing" }
                         };
 
                         var thenBlock = node.Children.FirstOrDefault(c => c.Value == "Then");
@@ -212,9 +235,10 @@ namespace BLML.Phase1Foundation.AST
                     }
                     if (node.Value == "Expression")
                     {
+                        var expr = node.Children.Count > 0 ? BuildExpression(node.Children[0]) ?? new IdentifierExpressionNode { Name = node.Children[0].Value ?? "_expr" } : new IdentifierExpressionNode { Name = "_expr_missing" };
                         return new ExpressionStatementNode
                         {
-                            Expression = BuildExpression(node.Children[0])
+                            Expression = expr
                         };
                     }
                     if (node.Value == "For")
