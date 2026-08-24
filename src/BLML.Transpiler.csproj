@@ -18,7 +18,6 @@
     <Compile Remove="Phase3-FormsUI\FormParsing\vb6formparser.cs" />
     <Compile Remove="Phase3-FormsUI\FormParsing\vb6binary.cs" />
     <Compile Remove="Phase4-DataAccess\**\*.cs" />
-    <Compile Remove="Phase5-ASPtoAngular\**\*.cs" />
     <Compile Remove="Phase6-Advanced\**\*.cs" />
     <Compile Remove="Phase7-Optimization\**\*.cs" />
     <Compile Remove="Phase8-Tooling\**\*.cs" />
@@ -37,24 +36,6 @@
     <Compile Include="Phase7-Optimization\CodeCleanup\DeadCodeRemover.cs" />
     <Compile Include="Phase7-Optimization\Documentation\XmlDocGenerator.cs" />
     <Compile Include="Phase7-Optimization\Refactoring\LinqOptimizer.cs" />
-    <Compile Include="Phase5-ASPtoAngular\Analysis\DatabaseCallAnalyzer.cs" />
-    <Compile Include="Phase5-ASPtoAngular\Analysis\PageFlowAnalyzer.cs" />
-    <Compile Include="Phase5-ASPtoAngular\Analysis\SessionVariableTracker.cs" />
-    <Compile Include="Phase5-ASPtoAngular\AspParser\AspLexer.cs" />
-    <Compile Include="Phase5-ASPtoAngular\AspParser\AspParser.cs" />
-    <Compile Include="Phase5-ASPtoAngular\AspParser\VBScriptParser.cs" />
-    <Compile Include="Phase5-ASPtoAngular\Backend\ApiGenerator\ControllerGenerator.cs" />
-    <Compile Include="Phase5-ASPtoAngular\Backend\ApiGenerator\DtoGenerator.cs" />
-    <Compile Include="Phase5-ASPtoAngular\Backend\ApiGenerator\ServiceGenerator.cs" />
-    <Compile Include="Phase5-ASPtoAngular\Backend\Infrastructure\AuthConverter.cs" />
-    <Compile Include="Phase5-ASPtoAngular\Backend\Infrastructure\MiddlewareGenerator.cs" />
-    <Compile Include="Phase5-ASPtoAngular\Database\EFCoreGenerator.cs" />
-    <Compile Include="Phase5-ASPtoAngular\Database\MigrationScripts.cs" />
-    <Compile Include="Phase5-ASPtoAngular\Database\RepositoryGenerator.cs" />
-    <Compile Include="Phase5-ASPtoAngular\Frontend\ComponentGenerator.cs" />
-    <Compile Include="Phase5-ASPtoAngular\Frontend\FormConverter.cs" />
-    <Compile Include="Phase5-ASPtoAngular\Frontend\RoutingGenerator.cs" />
-    <Compile Include="Phase5-ASPtoAngular\Frontend\TemplateConverter.cs" />
   </ItemGroup>
 
   <ItemGroup>
