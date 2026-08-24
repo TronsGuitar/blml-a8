@@ -325,7 +325,8 @@ git push origin feature/my-feature
 ## 🗺️ Technology Stack
 
 ### VB6 → C# Conversion
-- **.NET 8** - Target framework
+- **.NET 8** (`net8.0-windows` for WinForms, `net8.0` for libraries) - Target framework
+- **C# 12** (`LangVersion 12`) - Generated code language version
 - **Roslyn** - Code generation
 - **CodeDom** - Legacy code generation (being replaced)
 - **Windows Forms** - UI framework

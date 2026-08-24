@@ -52,6 +52,11 @@ The current `Phase1-Foundation` folder contains the core infrastructure for the 
 - parses `.vbp` files into a structured project model
 - exposes forms, modules, classes, and references for later tooling and reporting
 
+### `src/Phase1-Foundation/ProjectModel/CsprojGenerator.cs`
+
+- generates `.csproj` files targeting **net8.0-windows** (when forms/user controls are present) or **net8.0** (library-only)
+- generated projects use **C# 12** (`LangVersion 12`), `UseWindowsForms`, and nullable reference types
+
 ### `src/Phase1-Foundation/SymbolTable`, `TypeInference`, and `DependencyGraph`
 
 - contain active helper layers for semantic analysis and project understanding

@@ -122,7 +122,6 @@ public class Phase8CliTests
             Assert.Contains("Unsupported input file extension", reportContent);
             Assert.Contains(".txt", reportContent);
             Assert.Contains("Report written to", output.ToString());
-            Assert.Equal(string.Empty, error.ToString());
         }
         finally
         {

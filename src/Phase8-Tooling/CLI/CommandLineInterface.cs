@@ -133,6 +133,8 @@ namespace BLML.Phase8Tooling.CLI
                 var basePath = Path.GetDirectoryName(input);
                 int converted = 0;
                 int formFilesConverted = 0;
+                string startupFormName = null;
+                string subMainModuleName = null;
                 foreach(var relativeFile in allFiles)
                 {
                     if (string.IsNullOrWhiteSpace(relativeFile)) continue;
@@ -149,6 +151,11 @@ namespace BLML.Phase8Tooling.CLI
                             var formResult = FormFileConverter.ConvertFile(fileToConvert, outPath);
                             output.WriteLine($"  Generated {formResult.FormName}.frmx");
                             output.WriteLine($"  Generated {formResult.FormName}.Designer.cs");
+
+                            if (string.Equals(formResult.FormName, project.Startup, StringComparison.OrdinalIgnoreCase))
+                            {
+                                startupFormName = formResult.FormName;
+                            }
 
                             // Also transpile the code-behind section through the VB6 parser
                             if (!string.IsNullOrWhiteSpace(formResult.CodeSection))
@@ -184,13 +191,31 @@ namespace BLML.Phase8Tooling.CLI
                         }
                         if (!string.IsNullOrEmpty(result.CSharpCode))
                         {
-                            var targetName = Path.GetFileNameWithoutExtension(relativeFile) + ".cs";
+                            var moduleName = Path.GetFileNameWithoutExtension(relativeFile);
+                            var targetName = moduleName + ".cs";
                             File.WriteAllText(Path.Combine(outPath, targetName), result.CSharpCode);
                             converted++;
+
+                            if (string.Equals(project.Startup, "Sub Main", StringComparison.OrdinalIgnoreCase)
+                                && System.Text.RegularExpressions.Regex.IsMatch(code, @"\bSub\s+Main\s*\(", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                            {
+                                subMainModuleName = moduleName;
+                            }
                         }
                     }
                 }
                 
+                var isExecutable = project.Type?.Equals("Exe", StringComparison.OrdinalIgnoreCase) == true
+                    || project.Type?.Equals("OleExe", StringComparison.OrdinalIgnoreCase) == true;
+                if (isExecutable)
+                {
+                    var hasForms = project.Forms.Count > 0 || project.UserControls.Count > 0;
+                    var programGen = new BLML.Phase1Foundation.ProjectModel.ProgramGenerator();
+                    var programText = programGen.GenerateProgramFile(project, hasForms, startupFormName, subMainModuleName);
+                    File.WriteAllText(Path.Combine(outPath, "Program.cs"), programText);
+                    output.WriteLine("  Generated Program.cs");
+                }
+
                 output.WriteLine($"[progress] Converted {converted} out of {allFiles.Count} files ({formFilesConverted} forms) for project {projectName} into {outPath}");
                 return Task.FromResult((int)CliExitCode.Success);
             }
