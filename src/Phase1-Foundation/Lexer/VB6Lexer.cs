@@ -349,7 +349,7 @@ namespace BLML.Phase1Foundation.Lexer
             string[] multiCharOps = new[]
             {
                 "<=", ">=", "<>", "+=", "-=", "*=", "/=", "\\=", "&=", "^=",
-                "==", "=>", "->", "<<", ">>", "||", "&&"
+                "==", "=>", "->", "<<", ">>", "||", "&&", ":=" // := is VB6 named-argument syntax, e.g. Foo(bar:=1)
             };
 
             foreach (var op in multiCharOps)

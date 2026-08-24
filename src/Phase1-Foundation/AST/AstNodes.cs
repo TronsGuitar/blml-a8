@@ -66,6 +66,54 @@ namespace BLML.Phase1Foundation.AST
         public bool IsOptional { get; set; }
         public string DefaultValue { get; set; }
         public ExpressionNode? DefaultValueExpression { get; set; }
+        /// <summary>VB6 `ParamArray` - maps to a C# `params` array parameter. Always the last parameter, always effectively ByVal.</summary>
+        public bool IsParamArray { get; set; }
+    }
+
+    /// <summary>VB6 `Enum Name ... End Enum`.</summary>
+    public class EnumDeclarationNode : DeclarationNode
+    {
+        public List<EnumMemberNode> Members { get; } = new List<EnumMemberNode>();
+    }
+
+    public class EnumMemberNode : AstNode
+    {
+        public string Name { get; set; } = string.Empty;
+        public ExpressionNode? Value { get; set; }
+    }
+
+    /// <summary>VB6 `Declare Function/Sub Name Lib "x.dll" [Alias "y"] (params) [As ReturnType]` - maps to a C# `[DllImport]` extern method.</summary>
+    public class DeclareStatementNode : DeclarationNode
+    {
+        public bool IsFunction { get; set; }
+        public string LibraryName { get; set; } = string.Empty;
+        public string? Alias { get; set; }
+        public List<ParameterNode> Parameters { get; } = new List<ParameterNode>();
+        public string ReturnType { get; set; } = "void";
+    }
+
+    /// <summary>VB6 `With target ... End With`.</summary>
+    public class WithStatementNode : StatementNode
+    {
+        public ExpressionNode Target { get; set; } = null!;
+        public BlockNode Body { get; set; } = new BlockNode();
+    }
+
+    /// <summary>
+    /// A bare `.Member` reference inside a With block's body - resolved at code
+    /// generation time to `&lt;withTarget&gt;.Member`, since the AST alone doesn't carry
+    /// which With block a statement is nested in.
+    /// </summary>
+    public class WithMemberAccessExpressionNode : ExpressionNode
+    {
+        public string MemberName { get; set; } = string.Empty;
+    }
+
+    /// <summary>A VB6 named argument (`Foo(bar:=1)`) - only valid inside an InvocationExpressionNode's Arguments list.</summary>
+    public class NamedArgumentExpressionNode : ExpressionNode
+    {
+        public string Name { get; set; } = string.Empty;
+        public ExpressionNode Value { get; set; } = null!;
     }
 
     public class ExpressionStatementNode : StatementNode

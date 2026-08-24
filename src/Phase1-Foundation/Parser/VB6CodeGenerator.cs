@@ -9,6 +9,11 @@ namespace BLML.Phase1Foundation.Parser
 {
     public class VB6CodeGenerator
     {
+        // Tracks the expression each currently-open `With` block resolves a bare `.Member`
+        // reference against - a stack because VB6 allows nested With blocks.
+        private readonly Stack<ExpressionSyntax> _withTargetStack = new Stack<ExpressionSyntax>();
+        private int _withTempCounter;
+
         public string GenerateCSharpCode(ModuleNode module, BLML.Phase1Foundation.ProjectModel.VB6Project project = null)
         {
             if (module == null) return string.Empty;
@@ -98,6 +103,8 @@ namespace BLML.Phase1Foundation.Parser
             {
                 MethodDeclarationNode method => GenerateMethod(method),
                 VariableDeclarationNode variable => GenerateField(variable),
+                EnumDeclarationNode enumDecl => GenerateEnum(enumDecl),
+                DeclareStatementNode declare => GenerateDeclare(declare),
                 _ => null
             };
 #pragma warning restore CS8603 // Possible null reference return.
@@ -129,6 +136,57 @@ namespace BLML.Phase1Foundation.Parser
             return AddAccessibilityModifiers(field, node.Accessibility);
         }
 
+        private EnumDeclarationSyntax GenerateEnum(EnumDeclarationNode node)
+        {
+            var members = node.Members.Select(m =>
+            {
+                var member = SyntaxFactory.EnumMemberDeclaration(m.Name);
+                if (m.Value != null)
+                {
+                    member = member.WithEqualsValue(SyntaxFactory.EqualsValueClause(GenerateExpression(m.Value)));
+                }
+                return member;
+            });
+
+            var enumDecl = SyntaxFactory.EnumDeclaration(node.Name).AddMembers(members.ToArray());
+            return AddAccessibilityModifiers(enumDecl, node.Accessibility);
+        }
+
+        /// <summary>VB6 `Declare Function/Sub ... Lib "x.dll" [Alias "y"] (...)` -> a C# `[DllImport]` extern method.</summary>
+        private MethodDeclarationSyntax GenerateDeclare(DeclareStatementNode node)
+        {
+            var returnType = node.IsFunction
+                ? ParseVB6Type(node.ReturnType)
+                : SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.VoidKeyword));
+
+            var parameters = node.Parameters.Select(GenerateParameter).ToArray();
+
+            var dllImportArgs = new List<AttributeArgumentSyntax>
+            {
+                SyntaxFactory.AttributeArgument(SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, SyntaxFactory.Literal(node.LibraryName)))
+            };
+            if (!string.IsNullOrEmpty(node.Alias))
+            {
+                dllImportArgs.Add(SyntaxFactory.AttributeArgument(
+                    SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, SyntaxFactory.Literal(node.Alias)))
+                    .WithNameEquals(SyntaxFactory.NameEquals("EntryPoint")));
+            }
+
+            var dllImportAttribute = SyntaxFactory.Attribute(SyntaxFactory.ParseName("System.Runtime.InteropServices.DllImport"))
+                .WithArgumentList(SyntaxFactory.AttributeArgumentList(SyntaxFactory.SeparatedList(dllImportArgs)));
+
+            var method = SyntaxFactory.MethodDeclaration(returnType, node.Name)
+                .WithParameterList(SyntaxFactory.ParameterList(SyntaxFactory.SeparatedList(parameters)))
+                .AddAttributeLists(SyntaxFactory.AttributeList(SyntaxFactory.SingletonSeparatedList(dllImportAttribute)))
+                .WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.SemicolonToken));
+
+            // Accessibility must be added before static/extern - AddAccessibilityModifiers
+            // appends to whatever modifiers already exist, and C# convention (and the
+            // compiler's own preferred ordering) puts the access modifier first.
+            method = AddAccessibilityModifiers(method, node.Accessibility);
+            return method.AddModifiers(SyntaxFactory.Token(SyntaxKind.StaticKeyword), SyntaxFactory.Token(SyntaxKind.ExternKeyword));
+        }
+
         private MethodDeclarationSyntax GeneratePropertyProcedureFallbackMethod(PropertyDeclarationNode node)
         {
             var method = new MethodDeclarationNode
@@ -154,6 +212,19 @@ namespace BLML.Phase1Foundation.Parser
 
         private ParameterSyntax GenerateParameter(ParameterNode parameter)
         {
+            if (parameter.IsParamArray)
+            {
+                // ParamArray -> C# params array. params can't combine with ref or a default
+                // value in C#, and VB6 disallows ParamArray from being ByRef or Optional
+                // anyway, so there is nothing else to layer on here.
+                var arrayType = SyntaxFactory.ArrayType(ParseVB6Type(parameter.Type))
+                    .AddRankSpecifiers(SyntaxFactory.ArrayRankSpecifier(SyntaxFactory.SingletonSeparatedList<ExpressionSyntax>(SyntaxFactory.OmittedArraySizeExpression())));
+
+                return SyntaxFactory.Parameter(SyntaxFactory.Identifier(parameter.Name))
+                    .WithType(arrayType)
+                    .AddModifiers(SyntaxFactory.Token(SyntaxKind.ParamsKeyword));
+            }
+
             var generatedParameter = SyntaxFactory.Parameter(SyntaxFactory.Identifier(parameter.Name))
                 .WithType(ParseVB6Type(parameter.Type));
 
@@ -246,6 +317,17 @@ namespace BLML.Phase1Foundation.Parser
             };
         }
 
+        private EnumDeclarationSyntax AddAccessibilityModifiers(EnumDeclarationSyntax member, VB6Accessibility accessibility)
+        {
+            return accessibility switch
+            {
+                VB6Accessibility.Public => member.AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword)),
+                VB6Accessibility.Friend => member.AddModifiers(SyntaxFactory.Token(SyntaxKind.InternalKeyword)),
+                // C# has no "static enum" concept - VB6's Static accessibility on an Enum has no real meaning; fall back to private like other non-Public/Friend cases.
+                _ => member.AddModifiers(SyntaxFactory.Token(SyntaxKind.PrivateKeyword))
+            };
+        }
+
         private static string GetPropertyGroupKey(PropertyDeclarationNode propertyDeclaration)
         {
             return $"{propertyDeclaration.Accessibility}:{propertyDeclaration.Name}";
@@ -302,8 +384,57 @@ namespace BLML.Phase1Foundation.Parser
             {
                 return SyntaxFactory.BreakStatement();
             }
+            if (node is WithStatementNode withStmt)
+            {
+                return GenerateWithStatement(withStmt);
+            }
 
             return SyntaxFactory.EmptyStatement();
+        }
+
+        /// <summary>
+        /// `With target ... End With` has no direct C# equivalent construct - it's
+        /// purely a VB6 parsing convenience for resolving bare `.Member` references, so
+        /// this just inlines the body statements (with `_withTargetStack` set so nested
+        /// GenerateExpression calls can resolve those references) into a block.
+        ///
+        /// When the target itself is more than a simple identifier (e.g. `With
+        /// GetEmployee()`), VB6 evaluates it exactly once and every `.Member` reuses
+        /// that same instance - naively substituting the raw target expression at every
+        /// reference site would instead re-evaluate it each time, which is wrong if the
+        /// target expression has side effects. To preserve "evaluate once" semantics,
+        /// such targets are captured into a compiler-generated local first.
+        /// </summary>
+        private StatementSyntax GenerateWithStatement(WithStatementNode node)
+        {
+            var targetExpr = GenerateExpression(node.Target);
+            var statements = new List<StatementSyntax>();
+
+            ExpressionSyntax referenceExpr;
+            if (node.Target is IdentifierExpressionNode)
+            {
+                referenceExpr = targetExpr;
+            }
+            else
+            {
+                var tempName = $"__with{_withTempCounter++}";
+                referenceExpr = SyntaxFactory.IdentifierName(tempName);
+                var declaration = SyntaxFactory.VariableDeclaration(SyntaxFactory.IdentifierName("var"))
+                    .AddVariables(SyntaxFactory.VariableDeclarator(tempName).WithInitializer(SyntaxFactory.EqualsValueClause(targetExpr)));
+                statements.Add(SyntaxFactory.LocalDeclarationStatement(declaration));
+            }
+
+            _withTargetStack.Push(referenceExpr);
+            try
+            {
+                statements.AddRange(node.Body.Statements.Select(GenerateStatement));
+            }
+            finally
+            {
+                _withTargetStack.Pop();
+            }
+
+            return SyntaxFactory.Block(statements);
         }
 
         private StatementSyntax GenerateSelectCaseStatement(SelectCaseStatementNode node)
@@ -536,6 +667,22 @@ namespace BLML.Phase1Foundation.Parser
             }
         }
 
+        /// <summary>
+        /// A VB6 named argument (`Foo(bar:=1)`) can't be represented as an
+        /// ExpressionSyntax on its own - C#'s named-argument syntax
+        /// (`Foo(bar: 1)`) lives on the ArgumentSyntax, not the expression - so this is
+        /// handled at the call-argument-building call site rather than inside
+        /// GenerateExpression.
+        /// </summary>
+        private ArgumentSyntax GenerateArgument(ExpressionNode node)
+        {
+            if (node is NamedArgumentExpressionNode named)
+            {
+                return SyntaxFactory.Argument(GenerateExpression(named.Value)).WithNameColon(SyntaxFactory.NameColon(named.Name));
+            }
+            return SyntaxFactory.Argument(GenerateExpression(node));
+        }
+
         private ExpressionSyntax GenerateExpression(ExpressionNode node)
         {
             if (node is LiteralExpressionNode literal)
@@ -583,6 +730,13 @@ namespace BLML.Phase1Foundation.Parser
 
                 return SyntaxFactory.BinaryExpression(kind, GenerateExpression(binary.Left), GenerateExpression(binary.Right));
             }
+            if (node is WithMemberAccessExpressionNode withMember)
+            {
+                var target = _withTargetStack.Count > 0
+                    ? _withTargetStack.Peek()
+                    : SyntaxFactory.IdentifierName("/* Unresolved With target */");
+                return SyntaxFactory.MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, target, SyntaxFactory.IdentifierName(withMember.MemberName));
+            }
             if (node is InvocationExpressionNode invoke)
             {
                 if (invoke.Target is IdentifierExpressionNode targetIdentifier && BuiltInFunctionHandler.IsBuiltInFunction(targetIdentifier.Name))
@@ -591,7 +745,7 @@ namespace BLML.Phase1Foundation.Parser
                     return SyntaxFactory.ParseExpression(BuiltInFunctionHandler.GenerateCShrapCall(targetIdentifier.Name, generatedArguments));
                 }
 
-                var args = invoke.Arguments.Select(a => SyntaxFactory.Argument(GenerateExpression(a))).ToArray();
+                var args = invoke.Arguments.Select(GenerateArgument).ToArray();
                 return SyntaxFactory.InvocationExpression(GenerateExpression(invoke.Target))
                     .WithArgumentList(SyntaxFactory.ArgumentList(SyntaxFactory.SeparatedList(args)));
             }
