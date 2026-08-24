@@ -8,10 +8,12 @@ namespace BLML.Phase5ASPtoAngular.Analysis
 
     public class DatabaseCallSite
     {
-        /// <summary>Reconstructed SQL text: literal fragments verbatim, non-literal operands rendered as `?`.</summary>
+        /// <summary>Reconstructed SQL text: literal fragments verbatim, non-literal operands rendered as `?` in order.</summary>
         public string SqlText { get; set; } = string.Empty;
         /// <summary>True when the SQL was assembled by string concatenation with a non-literal operand - a SQL-injection risk unless parameterized.</summary>
         public bool BuiltByUnsafeConcatenation { get; set; }
+        /// <summary>Best-effort source text of each `?` placeholder in <see cref="SqlText"/>, in order - what ServiceGenerator binds as SqlParameters.</summary>
+        public List<string> ConcatenatedParameterExpressions { get; } = new();
         public List<string> TablesReferenced { get; } = new();
         public StatementNode Statement { get; set; } = null!;
     }
@@ -43,6 +45,82 @@ namespace BLML.Phase5ASPtoAngular.Analysis
             var objects = new Dictionary<string, AdoObjectInfo>(StringComparer.OrdinalIgnoreCase);
             Walk(statements, objects);
             return objects.Values.ToList();
+        }
+
+        /// <summary>
+        /// Finds every `rsVar("FieldName")` read for the given recordset variable, in
+        /// source order with duplicates removed - this is what drives DtoGenerator's
+        /// best-effort field list, since classic ASP has no schema to read the shape
+        /// from directly.
+        /// </summary>
+        public List<string> FindFieldReferences(IEnumerable<StatementNode> statements, string recordsetVariable)
+        {
+            var fields = new List<string>();
+            foreach (var expr in EnumerateExpressions(statements))
+            {
+                if (expr is InvocationExpressionNode inv
+                    && inv.Target is IdentifierExpressionNode id
+                    && string.Equals(id.Name, recordsetVariable, StringComparison.OrdinalIgnoreCase)
+                    && inv.Arguments.Count == 1
+                    && inv.Arguments[0] is LiteralExpressionNode { Value: string field }
+                    && !fields.Contains(field, StringComparer.OrdinalIgnoreCase))
+                {
+                    fields.Add(field);
+                }
+            }
+            return fields;
+        }
+
+        private static IEnumerable<ExpressionNode> EnumerateExpressions(IEnumerable<StatementNode> statements)
+        {
+            foreach (var stmt in statements)
+            {
+                IEnumerable<ExpressionNode> here = stmt switch
+                {
+                    AssignmentNode a => new[] { a.Target, a.Value },
+                    CallStatementNode c => new[] { c.Invocation },
+                    AspOutputExpressionStatementNode o => new[] { o.Expression },
+                    IfStatementNode i => new[] { i.Condition },
+                    SingleLineIfStatementNode s => new[] { s.Condition },
+                    WhileStatementNode w => new[] { w.Condition },
+                    _ => Enumerable.Empty<ExpressionNode>()
+                };
+                foreach (var e in here)
+                    foreach (var sub in EnumerateSubExpressions(e))
+                        yield return sub;
+
+                IEnumerable<StatementNode>? nested = stmt switch
+                {
+                    IfStatementNode i => i.ElseBlock is null ? i.TrueBlock.Statements : i.TrueBlock.Statements.Concat(i.ElseBlock.Statements),
+                    SingleLineIfStatementNode s => s.ElseStatement is null ? new[] { s.ThenStatement } : new[] { s.ThenStatement, s.ElseStatement },
+                    WhileStatementNode w => w.Body.Statements,
+                    DoLoopStatementNode d => d.Body.Statements,
+                    ForStatementNode f => f.Body.Statements,
+                    ForEachStatementNode fe => fe.Body.Statements,
+                    SelectCaseStatementNode sc => sc.Cases.SelectMany(c => c.Body.Statements).Concat(sc.CaseElseBlock?.Statements ?? Enumerable.Empty<StatementNode>()),
+                    _ => null
+                };
+                if (nested != null)
+                    foreach (var e in EnumerateExpressions(nested))
+                        yield return e;
+            }
+        }
+
+        private static IEnumerable<ExpressionNode> EnumerateSubExpressions(ExpressionNode expr)
+        {
+            yield return expr;
+            switch (expr)
+            {
+                case BinaryExpressionNode bin:
+                    if (bin.Left != null) foreach (var e in EnumerateSubExpressions(bin.Left)) yield return e;
+                    if (bin.Right != null) foreach (var e in EnumerateSubExpressions(bin.Right)) yield return e;
+                    break;
+                case InvocationExpressionNode inv:
+                    foreach (var e in EnumerateSubExpressions(inv.Target)) yield return e;
+                    foreach (var arg in inv.Arguments)
+                        foreach (var e in EnumerateSubExpressions(arg)) yield return e;
+                    break;
+            }
         }
 
         private void Walk(IEnumerable<StatementNode> statements, Dictionary<string, AdoObjectInfo> objects)
@@ -118,8 +196,10 @@ namespace BLML.Phase5ASPtoAngular.Analysis
 
         private static DatabaseCallSite BuildCallSite(ExpressionNode sqlExpr, StatementNode statement)
         {
-            var (text, unsafeConcat) = ReconstructSql(sqlExpr);
-            var site = new DatabaseCallSite { SqlText = text, BuiltByUnsafeConcatenation = unsafeConcat, Statement = statement };
+            var site = new DatabaseCallSite { Statement = statement };
+            var (text, unsafeConcat) = ReconstructSql(sqlExpr, site.ConcatenatedParameterExpressions);
+            site.SqlText = text;
+            site.BuiltByUnsafeConcatenation = unsafeConcat;
             foreach (Match m in TableRegex.Matches(text))
             {
                 var table = m.Groups[1].Value;
@@ -134,20 +214,30 @@ namespace BLML.Phase5ASPtoAngular.Analysis
         /// etc.) and reporting whether such a substitution was needed at all - that's
         /// the "was this built unsafely" signal.
         /// </summary>
-        private static (string text, bool unsafeConcat) ReconstructSql(ExpressionNode expr)
+        private static (string text, bool unsafeConcat) ReconstructSql(ExpressionNode expr, List<string> parameterExpressions)
         {
             switch (expr)
             {
                 case LiteralExpressionNode { Value: string s }:
                     return (s, false);
                 case BinaryExpressionNode { Operator: "&" } bin:
-                    var (leftText, leftUnsafe) = ReconstructSql(bin.Left);
-                    var (rightText, rightUnsafe) = ReconstructSql(bin.Right);
+                    var (leftText, leftUnsafe) = ReconstructSql(bin.Left, parameterExpressions);
+                    var (rightText, rightUnsafe) = ReconstructSql(bin.Right, parameterExpressions);
                     return (leftText + rightText, leftUnsafe || rightUnsafe);
                 default:
+                    parameterExpressions.Add(DescribeExpression(expr));
                     return ("?", true);
             }
         }
+
+        private static string DescribeExpression(ExpressionNode expr) => expr switch
+        {
+            IdentifierExpressionNode id => id.Name,
+            LiteralExpressionNode lit => lit.Value?.ToString() ?? "",
+            BinaryExpressionNode { Operator: "." } member => $"{DescribeExpression(member.Left)}.{DescribeExpression(member.Right)}",
+            InvocationExpressionNode inv => $"{DescribeExpression(inv.Target)}({string.Join(",", inv.Arguments.Select(DescribeExpression))})",
+            _ => "expr"
+        };
 
         private static bool TryGetCreateObjectProgId(ExpressionNode expr, out string? progId)
         {

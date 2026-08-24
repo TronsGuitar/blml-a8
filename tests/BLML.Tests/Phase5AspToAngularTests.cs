@@ -2,11 +2,93 @@ using Xunit;
 using BLML.Phase1Foundation.AST;
 using BLML.Phase5ASPtoAngular.AspParser;
 using BLML.Phase5ASPtoAngular.Analysis;
+using BLML.Phase5ASPtoAngular.Backend.ApiGenerator;
+using BLML.Phase5ASPtoAngular.Backend.Infrastructure;
 
 namespace BLML.Tests
 {
     public class Phase5AspToAngularTests
     {
+        [Fact]
+        public void DtoGenerator_EmitsUntypedPropertiesWithVerifyTodoForEachAspField()
+        {
+            var output = new DtoGenerator().GenerateDto("ProductDto", new[] { "Id", "Name", "Price" });
+
+            Assert.Contains("public class ProductDto", output);
+            Assert.Contains("public object? Id { get; set; }", output);
+            Assert.Contains("public object? Name { get; set; }", output);
+            Assert.Contains("// TODO: verify type", output);
+        }
+
+        [Fact]
+        public void ServiceGenerator_AlwaysParameterizesEvenWhenSourceSqlWasConcatenated()
+        {
+            var asp = "<% Set rs = Server.CreateObject(\"ADODB.Recordset\") %>"
+                     + "<% rs.Open \"SELECT * FROM Products WHERE Id=\" & id, conn %>";
+            var page = new AspParser().Parse(asp);
+            var adoObjects = new DatabaseCallAnalyzer().Analyze(page.Statements);
+            var site = adoObjects.Single().CallSites.Single();
+            Assert.True(site.BuiltByUnsafeConcatenation); // confirm the source really was unsafe
+
+            var spec = new ServiceMethodSpec { MethodName = "GetProducts", Site = site, ResultFields = new[] { "Id", "Name" } };
+            var output = new ServiceGenerator().GenerateServiceClass("ProductService", "ProductDto", new[] { spec });
+
+            Assert.Contains("new SqlCommand(\"SELECT * FROM Products WHERE Id=@id\", connection)", output);
+            Assert.Contains("command.Parameters.AddWithValue(\"@id\", id)", output);
+            Assert.DoesNotContain("\" & id", output); // no leftover string concatenation of user input into SQL
+        }
+
+        [Fact]
+        public void ControllerGenerator_DerivesRestVerbFromSqlStatement()
+        {
+            Assert.Equal(("GET", false), ControllerGenerator.DeriveVerbFromSql("SELECT * FROM Products"));
+            Assert.Equal(("POST", true), ControllerGenerator.DeriveVerbFromSql("INSERT INTO Products (Name) VALUES (?)"));
+            Assert.Equal(("PUT", true), ControllerGenerator.DeriveVerbFromSql("UPDATE Products SET Name=?"));
+            Assert.Equal(("DELETE", true), ControllerGenerator.DeriveVerbFromSql("DELETE FROM Products WHERE Id=?"));
+        }
+
+        [Fact]
+        public void ControllerGenerator_EmitsRestConventionActionsWithCorrectStatusCodes()
+        {
+            var actions = new[]
+            {
+                new ControllerActionSpec { MethodName = "GetProducts", ServiceMethodName = "GetProducts", HttpVerb = "GET" },
+                new ControllerActionSpec { MethodName = "CreateProduct", ServiceMethodName = "CreateProduct", HttpVerb = "POST" }
+            };
+            var output = new ControllerGenerator().GenerateController("products", "ProductsController", "ProductService", "ProductDto", actions);
+
+            Assert.Contains("[Route(\"api/products\")]", output);
+            Assert.Contains("[HttpGet(", output);
+            Assert.Contains("[HttpPost]", output);
+            Assert.Contains("StatusCode(201)", output);
+        }
+
+        [Fact]
+        public void AuthConverter_NormalizesAllThreeNullCheckIdiomsToOneClaimsCheck()
+        {
+            var info = new SessionVariableInfo { Name = "UserId" };
+            info.NullCheckIdiomsObserved.Add(SessionNullCheckIdiom.EqualsEmptyString);
+            info.NullCheckIdiomsObserved.Add(SessionNullCheckIdiom.IsEmptyCall);
+            info.NullCheckIdiomsObserved.Add(SessionNullCheckIdiom.IsNothingComparison);
+
+            var check = new AuthConverter().GenerateNormalizedNullCheck(info);
+
+            Assert.Contains("User.HasClaim(c => c.Type == \"UserId\")", check);
+            // exactly one generated check regardless of how many idioms the source mixed
+            Assert.Equal(1, System.Text.RegularExpressions.Regex.Matches(check, "User\\.HasClaim").Count);
+        }
+
+        [Fact]
+        public void MiddlewareGenerator_WiresCorsJwtAndServiceRegistrationsIntoProgramCs()
+        {
+            var output = new MiddlewareGenerator().GenerateProgramCs(new[] { "ProductService" }, "https://localhost:4200");
+
+            Assert.Contains("AddScoped<ProductService>", output);
+            Assert.Contains("WithOrigins(\"https://localhost:4200\")", output);
+            Assert.Contains("AddJwtBearer", output);
+            Assert.Contains("app.UseAuthentication();", output);
+            Assert.Contains("app.UseAuthorization();", output);
+        }
         [Fact]
         public void SessionVariableTracker_CatalogsReadsWritesAndAllThreeNullCheckIdioms()
         {
