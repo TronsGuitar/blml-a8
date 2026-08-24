@@ -1,11 +1,73 @@
 using Xunit;
 using BLML.Phase1Foundation.AST;
 using BLML.Phase5ASPtoAngular.AspParser;
+using BLML.Phase5ASPtoAngular.Analysis;
 
 namespace BLML.Tests
 {
     public class Phase5AspToAngularTests
     {
+        [Fact]
+        public void GlobalAsaParser_ExtractsLifecycleEventsAndObjectDeclarations()
+        {
+            var content = @"
+<OBJECT RUNAT=Server SCOPE=Application ID=DbConn PROGID=""ADODB.Connection"">
+</OBJECT>
+<SCRIPT LANGUAGE=""VBScript"" RUNAT=""Server"">
+Sub Application_OnStart
+    Application(""Name"") = ""MyApp""
+End Sub
+
+Sub Session_OnStart
+    Session.Timeout = 20
+End Sub
+</SCRIPT>";
+
+            var page = new GlobalAsaParser().Parse(content);
+
+            Assert.NotNull(page.ApplicationOnStart);
+            Assert.NotNull(page.SessionOnStart);
+            Assert.Null(page.ApplicationOnEnd);
+            var obj = Assert.Single(page.Objects);
+            Assert.Equal("DbConn", obj.Id);
+            Assert.Equal("ADODB.Connection", obj.ProgId);
+            Assert.Equal("Application", obj.Scope);
+        }
+
+        [Fact]
+        public void BusinessLogicExtractor_SeparatesAdoWorkFromHtmlOutput()
+        {
+            var asp = "<% Set rs = Server.CreateObject(\"ADODB.Recordset\") %><h1>Title</h1><%= name %>";
+            var page = new AspParser().Parse(asp);
+
+            var classified = new BusinessLogicExtractor().Classify(page.Statements);
+
+            var adoStatement = classified.First(c => c.Statement is AssignmentNode);
+            Assert.Equal(StatementKind.BusinessLogic, adoStatement.Kind);
+
+            var htmlStatement = classified.First(c => c.Statement is HtmlOutputStatementNode);
+            Assert.Equal(StatementKind.Presentation, htmlStatement.Kind);
+
+            var outputStatement = classified.First(c => c.Statement is AspOutputExpressionStatementNode);
+            Assert.Equal(StatementKind.Presentation, outputStatement.Kind);
+        }
+
+        [Fact]
+        public void BusinessLogicExtractor_PropagatesClassificationThroughSimpleDefUseChain()
+        {
+            // userId is assigned from a Session read (business logic); a later
+            // assignment that only reads userId (no Session/Request/ADO marker of its
+            // own) should still inherit that classification, since the computation it
+            // performs belongs in the service layer alongside where userId came from.
+            var asp = "<% userId = Session(\"UserId\") %><% displayName = userId & \" (VIP)\" %>";
+            var page = new AspParser().Parse(asp);
+
+            var classified = new BusinessLogicExtractor().Classify(page.Statements);
+            var assignments = classified.Where(c => c.Statement is AssignmentNode).ToList();
+
+            Assert.Equal(2, assignments.Count);
+            Assert.All(assignments, a => Assert.Equal(StatementKind.BusinessLogic, a.Kind));
+        }
         [Fact]
         public void AspLexer_SplitsHtmlCodeAndOutputExpressionRegions()
         {
