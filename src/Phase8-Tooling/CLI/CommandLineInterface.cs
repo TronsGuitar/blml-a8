@@ -294,6 +294,33 @@ namespace BLML.Phase8Tooling.CLI
                 output.WriteLine($"Report written to {reportPath}");
                 return Task.FromResult((int)CliExitCode.OperationFailed);
             }
+            if (command == "convert-asp-project")
+            {
+                var input = ""; var outPath = "";
+                for (int i = 1; i < args.Length; i++)
+                {
+                    if (args[i] == "--input" && i + 1 < args.Length) input = args[++i];
+                    else if (args[i] == "--output" && i + 1 < args.Length) outPath = args[++i];
+                }
+
+                if (string.IsNullOrWhiteSpace(input) || !Directory.Exists(input))
+                {
+                    error.WriteLine("An input directory containing .asp files is required.");
+                    return Task.FromResult((int)CliExitCode.InputNotFound);
+                }
+
+                if (string.IsNullOrWhiteSpace(outPath))
+                {
+                    outPath = Path.Combine(input, "converted");
+                }
+
+                var converter = new BLML.Phase5ASPtoAngular.AspProjectConverter();
+                var result = converter.ConvertDirectory(input, outPath);
+
+                foreach (var warning in result.Warnings) output.WriteLine($"  WARNING: {warning}");
+                output.WriteLine($"[progress] Generated {result.GeneratedFiles.Count} files into {outPath}");
+                return Task.FromResult((int)CliExitCode.Success);
+            }
             if (command == "form-export")
             {
                 var input = ""; var outPath = "";

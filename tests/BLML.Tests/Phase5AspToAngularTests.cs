@@ -6,11 +6,67 @@ using BLML.Phase5ASPtoAngular.Backend.ApiGenerator;
 using BLML.Phase5ASPtoAngular.Backend.Infrastructure;
 using BLML.Phase5ASPtoAngular.Frontend;
 using BLML.Phase5ASPtoAngular.Database;
+using BLML.Phase5ASPtoAngular;
 
 namespace BLML.Tests
 {
     public class Phase5AspToAngularTests
     {
+        [Fact]
+        public void AspProjectConverter_ConvertsAMiniAspAppIntoApiClientAppAndDatabaseArtifacts()
+        {
+            var root = Path.Combine(Path.GetTempPath(), "BLML.Tests", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            try
+            {
+                File.WriteAllText(Path.Combine(root, "index.asp"),
+                    "<html><body><a href=\"products.asp\">Products</a></body></html>");
+
+                File.WriteAllText(Path.Combine(root, "products.asp"), string.Join("\n",
+                    "<%",
+                    "Set rs = Server.CreateObject(\"ADODB.Recordset\")",
+                    "rs.Open \"SELECT * FROM Products\", conn",
+                    "%>",
+                    "<html><body><ul>",
+                    "<% While Not rs.EOF %>",
+                    "<li><%=rs(\"Name\")%></li>",
+                    "<% rs.MoveNext %>",
+                    "<% Wend %>",
+                    "</ul></body></html>"));
+
+                var converter = new AspProjectConverter();
+                var outputDir = Path.Combine(root, "out");
+
+                var result = converter.ConvertDirectory(root, outputDir);
+
+                Assert.True(File.Exists(Path.Combine(outputDir, "Api", "Dtos", "ProductsDto.cs")));
+                Assert.True(File.Exists(Path.Combine(outputDir, "Api", "Services", "ProductsService.cs")));
+                Assert.True(File.Exists(Path.Combine(outputDir, "Api", "Controllers", "ProductsController.cs")));
+                Assert.True(File.Exists(Path.Combine(outputDir, "Api", "Program.cs")));
+                Assert.True(File.Exists(Path.Combine(outputDir, "Database", "schema.sql")));
+                Assert.True(File.Exists(Path.Combine(outputDir, "ClientApp", "src", "app", "products", "products.component.ts")));
+                Assert.True(File.Exists(Path.Combine(outputDir, "ClientApp", "src", "app", "products", "products.component.html")));
+                Assert.True(File.Exists(Path.Combine(outputDir, "ClientApp", "src", "app", "app.routes.ts")));
+
+                var serviceCode = File.ReadAllText(Path.Combine(outputDir, "Api", "Services", "ProductsService.cs"));
+                Assert.Contains("SqlCommand", serviceCode);
+
+                var templateHtml = File.ReadAllText(Path.Combine(outputDir, "ClientApp", "src", "app", "products", "products.component.html"));
+                Assert.Contains("@for (item of rsItems(); track item.id)", templateHtml);
+
+                var routes = File.ReadAllText(Path.Combine(outputDir, "ClientApp", "src", "app", "app.routes.ts"));
+                Assert.Contains("path: ''", routes); // index.asp is the home page
+                Assert.Contains("products", routes);
+
+                // No anti-pattern findings should have leaked through as warnings for this simple page.
+                Assert.DoesNotContain(result.Warnings, w => w.Contains("no-legacy-structural-directives") || w.Contains("component-must-be-standalone"));
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
         [Fact]
         public void EFCoreGenerator_BuildsTableMetadataFromAspFieldUsageAndDelegatesToPhase4()
         {

@@ -42,7 +42,7 @@ src/
 ├── Phase2-CoreLanguage/   # [IMPLEMENTED] Language feature conversion (CodeGeneration, Converters)
 ├── Phase3-FormsUI/        # [IMPLEMENTED] WinForms conversion (Layout, FormParsing)
 ├── Phase4-DataAccess/     # [IMPLEMENTED] Database migration (ADO, SQL, EF)
-├── Phase5-ASPtoAngular/   # [STUBBED] Web stack migration (Parser, Backend, Frontend)
+├── Phase5-ASPtoAngular/   # [IMPLEMENTED] ASP/VBScript parsing, analysis, .NET 8 API + standalone Angular 17+ generation, DB (see README.md)
 ├── Phase6-Advanced/       # [STUBBED] COM, Late Binding, Optimize
 ├── Phase7-Optimization/   # [STUBBED] Code Cleanup, Refactoring
 └── Phase8-Tooling/        # [STUBBED] CLI, IDE integration
@@ -94,7 +94,10 @@ All core phases have been structurally implemented.
 - **Phase 2**: Core converters (Variable, ControlFlow) and Generator are implemented.
 - **Phase 3**: LayoutConverter implements `.frm` parsing and WinForms Designer generation.
 - **Phase 4**: Basic ADO and Schema generators stubbed/implemented.
-- **Phase 5-8**: Stubs created for all core components.
+- **Phase 5**: Real ASP/VBScript parser, analysis passes, .NET 8 Web API backend generation,
+  standalone Angular 17+ frontend generation with an anti-pattern checker, and DB generation
+  (delegates to Phase 4). Wired end-to-end via `AspProjectConverter` / CLI `convert-asp-project`.
+- **Phase 6-8**: Stubs created for all core components.
 
 ### Build Configuration
 
