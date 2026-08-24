@@ -1,10 +1,71 @@
+using Microsoft.CodeAnalysis.CSharp;
 using BLML.Phase1Foundation.Parser;
 using BLML.Phase6Advanced.COM;
+using BLML.Phase6Advanced.Collections;
+using BLML.Phase6Advanced.LateBinding;
 
 namespace BLML.Tests;
 
 public class Phase6LanguageFeaturesTests
 {
+    [Fact]
+    public void CollectionConverter_ConvertsUnkeyedAddToListAdd()
+    {
+        var converter = new CollectionConverter();
+        var item = SyntaxFactory.ParseExpression("42");
+
+        var stmt = converter.ConvertAdd("items", item, key: null);
+
+        Assert.Equal("items.Add(42);", stmt.ToString());
+    }
+
+    [Fact]
+    public void CollectionConverter_ConvertsKeyedAddToDictionaryIndexerAssignment()
+    {
+        var converter = new CollectionConverter();
+        var item = SyntaxFactory.ParseExpression("42");
+        var key = SyntaxFactory.ParseExpression("\"answer\"");
+
+        var stmt = converter.ConvertAdd("items", item, key);
+
+        Assert.Equal("items[\"answer\"]=42;", stmt.ToString());
+    }
+
+    [Fact]
+    public void CollectionConverter_ConvertsOneBasedIndexAccessToZeroBased()
+    {
+        var converter = new CollectionConverter();
+        var index = SyntaxFactory.ParseExpression("1"); // VB6's first element
+
+        var expr = converter.ConvertItemAccess("items", index, isKeyed: false);
+
+        Assert.Equal("items[(1-1)]", expr.ToString());
+    }
+
+    [Fact]
+    public void CollectionConverter_ConvertsKeyedItemAccessDirectly()
+    {
+        var converter = new CollectionConverter();
+        var key = SyntaxFactory.ParseExpression("\"answer\"");
+
+        var expr = converter.ConvertItemAccess("items", key, isKeyed: true);
+
+        Assert.Equal("items[\"answer\"]", expr.ToString());
+    }
+
+    [Theory]
+    [InlineData("Variant", true)]
+    [InlineData("Object", true)]
+    [InlineData("", true)]
+    [InlineData("Integer", false)]
+    [InlineData("String", false)]
+    public void DynamicConverter_IdentifiesLateBoundTypesCorrectly(string vb6Type, bool expected)
+    {
+        var converter = new DynamicConverter();
+
+        Assert.Equal(expected, converter.ShouldUseDynamic(vb6Type));
+    }
+
     [Fact]
     public void Parser_ShouldConvertCreateObjectToLateBoundActivatorCreateInstance()
     {
