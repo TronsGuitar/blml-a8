@@ -4,11 +4,118 @@ using BLML.Phase5ASPtoAngular.AspParser;
 using BLML.Phase5ASPtoAngular.Analysis;
 using BLML.Phase5ASPtoAngular.Backend.ApiGenerator;
 using BLML.Phase5ASPtoAngular.Backend.Infrastructure;
+using BLML.Phase5ASPtoAngular.Frontend;
 
 namespace BLML.Tests
 {
     public class Phase5AspToAngularTests
     {
+        [Fact]
+        public void TemplateConverter_RendersClassicRecordsetLoopAsForWithTrackAndFieldAccess()
+        {
+            var asp = "<% While Not rs.EOF %><tr><td><%=rs(\"Name\")%></td></tr><% rs.MoveNext %><% Wend %>";
+            var page = new AspParser().Parse(asp);
+
+            var html = new TemplateConverter().Convert(page.Statements);
+
+            Assert.Contains("@for (item of rsItems(); track item.id)", html);
+            Assert.Contains("{{ item.name }}", html);
+            Assert.DoesNotContain("MoveNext", html); // loop mechanics dropped, not mistranslated
+        }
+
+        [Fact]
+        public void TemplateConverter_RendersElseIfChainAsAtElseIf()
+        {
+            var asp = "<% If x = 1 Then %>A<% ElseIf x = 2 Then %>B<% Else %>C<% End If %>";
+            var page = new AspParser().Parse(asp);
+
+            var html = new TemplateConverter().Convert(page.Statements);
+
+            Assert.Contains("@if (", html);
+            Assert.Contains("@else if (", html);
+            Assert.Contains("@else {", html);
+            Assert.Contains("A", html);
+            Assert.Contains("B", html);
+            Assert.Contains("C", html);
+        }
+
+        [Fact]
+        public void TemplateConverter_TranslatesResponseWriteToInterpolation()
+        {
+            var asp = "<% Response.Write name %>";
+            var page = new AspParser().Parse(asp);
+
+            var html = new TemplateConverter().Convert(page.Statements);
+
+            Assert.Contains("{{ name }}", html);
+        }
+
+        [Fact]
+        public void AngularAntiPatternChecker_FlagsEveryTargetedLegacyPattern()
+        {
+            var checker = new AngularAntiPatternChecker();
+
+            var templateFindings = checker.CheckTemplate("<div *ngIf=\"x\"></div>@for (x of items) { {{x}} }<input [(ngModel)]=\"y\">");
+            Assert.Contains(templateFindings, f => f.Rule == "no-legacy-structural-directives");
+            Assert.Contains(templateFindings, f => f.Rule == "for-requires-track");
+            Assert.Contains(templateFindings, f => f.Rule == "no-ngmodel-two-way-binding");
+
+            var badComponent = "@NgModule({})\nexport class X {\n  constructor(private http: HttpClient) {}\n  load(): any { this.http.get('/x').subscribe(r => r); }\n  el = document.getElementById('x');\n}";
+            var componentFindings = checker.CheckComponent(badComponent);
+            Assert.Contains(componentFindings, f => f.Rule == "no-ngmodule");
+            Assert.Contains(componentFindings, f => f.Rule == "no-any-type");
+            Assert.Contains(componentFindings, f => f.Rule == "no-unmanaged-subscribe");
+            Assert.Contains(componentFindings, f => f.Rule == "prefer-inject-function");
+            Assert.Contains(componentFindings, f => f.Rule == "no-direct-dom-access");
+        }
+
+        [Fact]
+        public void ComponentGenerator_OwnOutputPassesTheAntiPatternChecker()
+        {
+            var generator = new ComponentGenerator();
+            var template = "@for (item of rsItems(); track item.id) { <li>{{ item.name }}</li> }";
+
+            var component = generator.GenerateComponent("ProductsComponent", "app-products", "/api/products", "ProductDto", template, new[] { "rsItems" });
+
+            Assert.Empty(component.Findings);
+            Assert.Contains("standalone: true", component.TypeScript);
+            Assert.Contains("inject(HttpClient)", component.TypeScript);
+            Assert.Contains("toSignal(", component.TypeScript);
+            Assert.DoesNotContain("constructor(", component.TypeScript);
+        }
+
+        [Fact]
+        public void FormConverter_InfersRequiredFromEmptyCheckAndFlagsAmbiguousBareRequestAccess()
+        {
+            var asp = "<% If Request.Form(\"Email\") = \"\" Then %>Missing<% End If %><% x = Request(\"Promo\") %>";
+            var page = new AspParser().Parse(asp);
+
+            var result = new FormConverter().Convert(page.Statements, "checkoutForm");
+
+            var email = result.Fields.Single(f => f.Name == "Email");
+            Assert.True(email.Required);
+            Assert.True(email.LooksLikeEmail);
+            Assert.Contains(result.Fields, f => f.Name == "Promo");
+            Assert.Contains(result.Warnings, w => w.Contains("ambiguous"));
+            Assert.Contains("Validators.required", result.TypeScript);
+            Assert.Contains("FormBuilder", result.TypeScript); // uses typed Reactive Forms, not template-driven ngModel binding
+        }
+
+        [Fact]
+        public void RoutingGenerator_PutsHomePageAtEmptyPathAndOthersAtKebabRoutes()
+        {
+            var edges = new List<PageFlowEdge>
+            {
+                new() { FromPage = "index.asp", ToPage = "productDetails.asp", Trigger = PageFlowTrigger.Link }
+            };
+
+            var routes = new RoutingGenerator().GenerateRoutes(edges, "index.asp");
+
+            Assert.Contains("{ path: '', loadComponent:", routes);
+            Assert.Contains("product-details", routes);
+            Assert.Contains("ProductDetailsComponent", routes);
+            Assert.Contains("{ path: '**', redirectTo: '' }", routes);
+        }
         [Fact]
         public void DtoGenerator_EmitsUntypedPropertiesWithVerifyTodoForEachAspField()
         {
