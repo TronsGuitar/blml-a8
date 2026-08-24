@@ -19,7 +19,6 @@
     <Compile Remove="Phase3-FormsUI\FormParsing\vb6binary.cs" />
     <Compile Remove="Phase4-DataAccess\**\*.cs" />
     <Compile Remove="Phase5-ASPtoAngular\**\*.cs" />
-    <Compile Remove="Phase6-Advanced\**\*.cs" />
     <Compile Remove="Phase7-Optimization\**\*.cs" />
     <Compile Remove="Phase8-Tooling\**\*.cs" />
     <Compile Remove="Phase1-Foundation\Lexer\parseVB6Constants.cs" />

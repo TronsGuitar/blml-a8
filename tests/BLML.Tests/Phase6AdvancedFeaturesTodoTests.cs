@@ -9,8 +9,10 @@ public class Phase6AdvancedFeaturesTodoTests
 
         var expectedFiles = new[]
         {
-            "src/Phase6-AdvancedFeatures/README.md",
-            "src/Phase6-AdvancedFeatures/PropertyProcedureGenerator.cs",
+            "src/Phase6-Advanced/README.md",
+            "src/Phase6-Advanced/PropertyProcedureGenerator.cs",
+            "src/Phase6-Advanced/COM/determineInterop.cs",
+            "src/Phase6-Advanced/COM/TypeLibConverter.cs",
             "docs/Phase6-AdvancedFeatures-TODO.md",
             "src/Phase1-Foundation/Parser/VB6Parser.cs",
             "src/Phase1-Foundation/AST/AstBuilder.cs",
@@ -31,13 +33,13 @@ public class Phase6AdvancedFeaturesTodoTests
     [Fact]
     public void Phase6Readme_ShouldDescribeCurrentImplementationAndRemainingGaps()
     {
-        var content = File.ReadAllText(GetRepoPath(GetRepoRoot(), "src/Phase6-AdvancedFeatures/README.md"));
+        var content = File.ReadAllText(GetRepoPath(GetRepoRoot(), "src/Phase6-Advanced/README.md"));
 
         Assert.Contains("# Phase6 Advanced Features", content);
         Assert.Contains("## Current Phase6 surface area", content);
         Assert.Contains("PropertyProcedureGenerator.cs", content);
-        Assert.Contains("PropertyDeclarationNode", content);
-        Assert.Contains("optional/default parameter values", content);
+        Assert.Contains("Property Get", content);
+        Assert.Contains("optional/default parameter", content);
         Assert.Contains("## Not implemented yet", content);
         Assert.Contains("ParamArray", content);
         Assert.Contains("DllImport", content);
@@ -52,7 +54,7 @@ public class Phase6AdvancedFeaturesTodoTests
         var astBuilderContent = File.ReadAllText(GetRepoPath(repoRoot, "src/Phase1-Foundation/AST/AstBuilder.cs"));
         var astNodesContent = File.ReadAllText(GetRepoPath(repoRoot, "src/Phase1-Foundation/AST/AstNodes.cs"));
         var codeGeneratorContent = File.ReadAllText(GetRepoPath(repoRoot, "src/Phase1-Foundation/Parser/VB6CodeGenerator.cs"));
-        var propertyGeneratorContent = File.ReadAllText(GetRepoPath(repoRoot, "src/Phase6-AdvancedFeatures/PropertyProcedureGenerator.cs"));
+        var propertyGeneratorContent = File.ReadAllText(GetRepoPath(repoRoot, "src/Phase6-Advanced/PropertyProcedureGenerator.cs"));
         var keywordsContent = File.ReadAllText(GetRepoPath(repoRoot, "src/Phase1-Foundation/Lexer/VB6Keywords.cs"));
         var activeXContent = File.ReadAllText(GetRepoPath(repoRoot, "src/Phase3-FormsUI/ControlMapping/ActiveXFormCodeGenerator.cs"));
         var formParserContent = File.ReadAllText(GetRepoPath(repoRoot, "src/Phase3-FormsUI/FormParsing/frmParser.cs"));

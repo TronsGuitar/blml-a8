@@ -1,6 +1,6 @@
 using BLML.Phase1Foundation.AST;
 using BLML.Phase1Foundation.SymbolTable;
-using BLML.Phase6AdvancedFeatures;
+using BLML.Phase6Advanced;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;

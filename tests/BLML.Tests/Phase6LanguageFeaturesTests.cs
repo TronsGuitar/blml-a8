@@ -1,9 +1,41 @@
 using BLML.Phase1Foundation.Parser;
+using BLML.Phase6Advanced.COM;
 
 namespace BLML.Tests;
 
 public class Phase6LanguageFeaturesTests
 {
+    [Fact]
+    public void Parser_ShouldConvertCreateObjectToLateBoundActivatorCreateInstance()
+    {
+        var parser = new VB6Parser();
+        var result = parser.TranspileFile(@"
+Public Sub Run()
+    Set app = CreateObject(""Excel.Application"")
+End Sub");
+
+        Assert.Empty(result.Errors);
+        Assert.Contains("System.Activator.CreateInstance(System.Type.GetTypeFromProgID(\"Excel.Application\"))", result.CSharpCode);
+    }
+
+    [Fact]
+    public void TypeLibConverter_ConvertsCreateObjectCallToLateBoundExpression()
+    {
+        var converter = new TypeLibConverter();
+
+        var expr = converter.ConvertCreateObjectCall("Excel.Application");
+
+        Assert.Equal("System.Activator.CreateInstance(System.Type.GetTypeFromProgID(\"Excel.Application\"))", expr.ToString());
+    }
+
+    [Fact]
+    public void TypeLibConverter_IsCreateObjectCall_MatchesCaseInsensitively()
+    {
+        Assert.True(TypeLibConverter.IsCreateObjectCall("CreateObject"));
+        Assert.True(TypeLibConverter.IsCreateObjectCall("createobject"));
+        Assert.False(TypeLibConverter.IsCreateObjectCall("GetObject"));
+    }
+
     [Fact]
     public void Parser_ShouldConvertEnumWithExplicitAndImplicitValues()
     {
