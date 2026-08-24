@@ -91,7 +91,8 @@ The CLI must provide:
 
 ## Non-functional requirements
 
-- target `.NET 8`
+- target `.NET 8` (`net8.0-windows` for generated WinForms projects, `net8.0` for libraries)
+- generated projects use **C# 12** (`LangVersion 12`)
 - keep startup fast for simple commands such as `--help` and validation
 - avoid direct UI dependencies
 - be script-friendly for PowerShell and CI pipelines
