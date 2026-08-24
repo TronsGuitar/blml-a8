@@ -99,8 +99,13 @@ All core phases have been structurally implemented.
 ### Build Configuration
 
 ```xml
-Target Framework: net8.0
+Target Framework: net8.0 (net8.0-windows for WinForms output)
+C# Language Version: 12
 Implicit Usings: Enabled
 Nullable Reference Types: Enabled
 Root Namespace: BLML
 ```
+
+### Code Generation Output Target
+
+Generated C# projects target **net8.0-windows** with **LangVersion 12** when the source VB6 project contains forms or user controls, otherwise **net8.0**.
