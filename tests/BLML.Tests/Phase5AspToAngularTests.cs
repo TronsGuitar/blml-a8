@@ -8,6 +8,70 @@ namespace BLML.Tests
     public class Phase5AspToAngularTests
     {
         [Fact]
+        public void SessionVariableTracker_CatalogsReadsWritesAndAllThreeNullCheckIdioms()
+        {
+            var asp = "<% Session(\"UserId\") = 42 %>"
+                     + "<% If Session(\"UserId\") = \"\" Then %>A<% End If %>"
+                     + "<% If IsEmpty(Session(\"UserId\")) Then %>B<% End If %>"
+                     + "<% If Session(\"UserId\") Is Nothing Then %>C<% End If %>";
+            var page = new AspParser().Parse(asp);
+
+            var catalog = new SessionVariableTracker().Catalog(page.Statements);
+
+            var info = catalog["UserId"];
+            Assert.Single(info.WriteSites);
+            Assert.Equal(3, info.ReadSites.Count);
+            Assert.Contains(SessionNullCheckIdiom.EqualsEmptyString, info.NullCheckIdiomsObserved);
+            Assert.Contains(SessionNullCheckIdiom.IsEmptyCall, info.NullCheckIdiomsObserved);
+            Assert.Contains(SessionNullCheckIdiom.IsNothingComparison, info.NullCheckIdiomsObserved);
+        }
+
+        [Fact]
+        public void DatabaseCallAnalyzer_FlagsSqlBuiltByUnsafeConcatenationAndExtractsTableName()
+        {
+            var asp = "<% Set rs = Server.CreateObject(\"ADODB.Recordset\") %>"
+                     + "<% rs.Open \"SELECT * FROM Users WHERE Id=\" & userId, conn %>";
+            var page = new AspParser().Parse(asp);
+
+            var results = new DatabaseCallAnalyzer().Analyze(page.Statements);
+
+            var rsInfo = Assert.Single(results);
+            Assert.Equal(AdoObjectKind.Recordset, rsInfo.Kind);
+            var callSite = Assert.Single(rsInfo.CallSites);
+            Assert.True(callSite.BuiltByUnsafeConcatenation);
+            Assert.Contains("Users", callSite.TablesReferenced);
+        }
+
+        [Fact]
+        public void DatabaseCallAnalyzer_DoesNotFlagPureLiteralSqlAsUnsafe()
+        {
+            var asp = "<% Set rs = Server.CreateObject(\"ADODB.Recordset\") %>"
+                     + "<% rs.Open \"SELECT * FROM Products\", conn %>";
+            var page = new AspParser().Parse(asp);
+
+            var results = new DatabaseCallAnalyzer().Analyze(page.Statements);
+
+            var callSite = Assert.Single(Assert.Single(results).CallSites);
+            Assert.False(callSite.BuiltByUnsafeConcatenation);
+            Assert.Contains("Products", callSite.TablesReferenced);
+        }
+
+        [Fact]
+        public void PageFlowAnalyzer_FindsServerRedirectFormAndLinkTargets()
+        {
+            var asp = "<% If Not loggedIn Then Response.Redirect \"login.asp\" %>"
+                     + "<form action=\"save.asp\" method=\"post\"></form>"
+                     + "<a href=\"details.asp?id=1\">details</a>";
+            var page = new AspParser().Parse(asp);
+
+            var edges = new PageFlowAnalyzer().Analyze(page.Statements, "index.asp");
+
+            Assert.Contains(edges, e => e.ToPage == "login.asp" && e.Trigger == PageFlowTrigger.Redirect);
+            Assert.Contains(edges, e => e.ToPage == "save.asp" && e.Trigger == PageFlowTrigger.FormSubmit && e.HttpMethod == "POST");
+            Assert.Contains(edges, e => e.ToPage == "details.asp" && e.Trigger == PageFlowTrigger.Link);
+        }
+
+        [Fact]
         public void GlobalAsaParser_ExtractsLifecycleEventsAndObjectDeclarations()
         {
             var content = @"
