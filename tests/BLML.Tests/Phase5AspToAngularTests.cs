@@ -5,11 +5,64 @@ using BLML.Phase5ASPtoAngular.Analysis;
 using BLML.Phase5ASPtoAngular.Backend.ApiGenerator;
 using BLML.Phase5ASPtoAngular.Backend.Infrastructure;
 using BLML.Phase5ASPtoAngular.Frontend;
+using BLML.Phase5ASPtoAngular.Database;
 
 namespace BLML.Tests
 {
     public class Phase5AspToAngularTests
     {
+        [Fact]
+        public void EFCoreGenerator_BuildsTableMetadataFromAspFieldUsageAndDelegatesToPhase4()
+        {
+            var asp = "<% Set rs = Server.CreateObject(\"ADODB.Recordset\") %>"
+                     + "<% rs.Open \"SELECT * FROM Products\", conn %>"
+                     + "<%= rs(\"Id\") %><%= rs(\"Name\") %>";
+            var page = new AspParser().Parse(asp);
+            var fields = new DatabaseCallAnalyzer().FindFieldReferences(page.Statements, "rs");
+
+            var generator = new EFCoreGenerator();
+            var table = generator.BuildTableMetadata("Products", fields, new[] { "Id" });
+            var entityOutput = generator.GenerateEntities(new[] { table });
+            var contextOutput = generator.GenerateDbContext("ApiDbContext", new List<BLML.Phase4DataAccess.Models.TableMetadata> { table });
+
+            Assert.Contains("public class Products", entityOutput);
+            Assert.Contains("public string Id { get; set; }", entityOutput); // Phase4's EntityGenerator maps our "string" placeholder type through as-is
+            Assert.Contains("public class ApiDbContext : DbContext", contextOutput);
+        }
+
+        [Fact]
+        public void MigrationScripts_DelegatesToPhase4SchemaAndBulkCopyGenerators()
+        {
+            var table = new BLML.Phase4DataAccess.Models.TableMetadata
+            {
+                Name = "Products",
+                Columns = { new BLML.Phase4DataAccess.Models.ColumnMetadata { Name = "Id", DataType = "int", IsNullable = false } },
+                PrimaryKeyColumns = { "Id" }
+            };
+
+            var scripts = new MigrationScripts();
+            var createScript = scripts.GenerateCreateScripts(new[] { table });
+            var bulkCopyScript = scripts.GenerateBulkCopyScripts(new[] { table });
+
+            Assert.Contains("CREATE TABLE [Products]", createScript);
+            Assert.Contains("MigrateProducts", bulkCopyScript);
+            Assert.Contains("SqlBulkCopy", bulkCopyScript);
+        }
+
+        [Fact]
+        public void RepositoryGenerator_EmitsCrudInterfaceAndImplementationOverTheGeneratedDbContext()
+        {
+            var table = new BLML.Phase4DataAccess.Models.TableMetadata { Name = "Products", PrimaryKeyColumns = { "Id" } };
+
+            var generator = new RepositoryGenerator();
+            var iface = generator.GenerateRepositoryInterface(table);
+            var impl = generator.GenerateRepositoryImplementation(table, "ApiDbContext");
+
+            Assert.Contains("interface IProductsRepository", iface);
+            Assert.Contains("class ProductsRepository : IProductsRepository", impl);
+            Assert.Contains("private readonly ApiDbContext _context", impl);
+            Assert.Contains("await _context.SaveChangesAsync();", impl);
+        }
         [Fact]
         public void TemplateConverter_RendersClassicRecordsetLoopAsForWithTrackAndFieldAccess()
         {
