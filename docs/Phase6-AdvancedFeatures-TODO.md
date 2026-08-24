@@ -63,8 +63,12 @@ The broader advanced-feature conversion pipeline is still incomplete.
    `System.Runtime.InteropServices.TypeLibConverter`, a .NET-Framework-only API unavailable on
    .NET 8).
 5. ~~Add VB6 `Enum` parsing and C# enum generation.~~ Done.
-6. Expand advanced control coverage for `SSTab`, `MSFlexGrid`, `TreeView`, `ListView`,
-   `CommonDialog`, `RichTextBox`, and third-party controls. Still open.
+6. ~~Expand advanced control coverage for `SSTab`, `MSFlexGrid`, `TreeView`, `ListView`,
+   `CommonDialog`, `RichTextBox`, and third-party controls.~~ Done for the six named controls,
+   via `FrmParser.Vb6ToCSharpControls` (the load-bearing mapping table for the CLI's actual
+   `convert`/`form-export` pipeline - not `src/Phase3-FormsUI/ControlMapping/`, which turned out
+   to be a separate, not-fully-wired-in pipeline). Third-party/other controls still fall through
+   to a pass-through default rather than a mapping. See `src/Phase6-Advanced/README.md`.
 7. Add more fixture-based tests with representative VB6 samples for each advanced feature. Done
    for `Enum`/`Declare`/`ParamArray`/named-arguments/`With`/`CreateObject` - see
    `tests/BLML.Tests/Phase6LanguageFeaturesTests.cs`. Still needed for `CollectionConverter`/
