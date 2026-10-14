@@ -19,7 +19,24 @@ public static class FrmParser
         ["VB.PictureBox"] = "System.Windows.Forms.PictureBox",
         ["VB.HScrollBar"] = "System.Windows.Forms.HScrollBar",
         ["VB.VScrollBar"] = "System.Windows.Forms.VScrollBar",
-        ["VB.Timer"] = "System.Windows.Forms.Timer"
+        ["VB.Timer"] = "System.Windows.Forms.Timer",
+
+        // Advanced/ActiveX controls (ProgIDs as VB6 .frm files actually declare them -
+        // these come from separate OCX libraries, not the VB.* set above).
+        ["TabDlg.SSTab"] = "System.Windows.Forms.TabControl", // tabctl32.ocx
+        ["MSComctlLib.TreeView"] = "System.Windows.Forms.TreeView", // comctl32.ocx / mscomctl.ocx
+        ["MSComctlLib.ListView"] = "System.Windows.Forms.ListView", // comctl32.ocx / mscomctl.ocx
+        ["MSFlexGridLib.MSFlexGrid"] = "System.Windows.Forms.DataGridView", // msflxgrd.ocx
+        ["RichTextLib.RichTextBox"] = "System.Windows.Forms.RichTextBox", // richtx32.ocx
+        // VB6's CommonDialog (comdlg32.ocx) is one non-visual control whose ShowOpen/
+        // ShowSave/ShowColor/ShowFont/ShowPrint methods each show a different dialog;
+        // .NET has no single equivalent type, since each of those is its own class
+        // (OpenFileDialog/SaveFileDialog/ColorDialog/FontDialog/PrintDialog). Mapping
+        // the control declaration to OpenFileDialog covers the single most common use
+        // (ShowOpen) - call sites using the other Show* methods need a manual follow-up
+        // to the matching dialog type, since a per-declaration mapping can't know in
+        // advance which Show* method(s) a given CommonDialog instance will actually use.
+        ["MSComDlg.CommonDialog"] = "System.Windows.Forms.OpenFileDialog"
     };
 
     private static readonly Regex BeginRegex = new(@"^Begin\s+(?<Type>[\w\.]+)\s+(?<Name>\w+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);

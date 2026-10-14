@@ -11,7 +11,10 @@ namespace BLML.Phase1Foundation.AST
         Statement,
         Expression,
         Type,
-        Variable
+        Variable,
+        Enum,
+        EnumMember,
+        Declare
     }
 
     public class VB6SyntaxNode

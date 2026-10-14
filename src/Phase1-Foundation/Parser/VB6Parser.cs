@@ -105,6 +105,10 @@ namespace BLML.Phase1Foundation.Parser
                     return ParseSub();
                 case "property":
                     return ParseProperty();
+                case "enum":
+                    return ParseEnum();
+                case "declare":
+                    return ParseDeclare();
                 case "version":
                     return ParseVersion();
                 case "begin":
@@ -131,6 +135,12 @@ namespace BLML.Phase1Foundation.Parser
                             case "property":
                                 SkipToken();
                                 return ParseProperty(accessibility);
+                            case "enum":
+                                SkipToken();
+                                return ParseEnum(accessibility);
+                            case "declare":
+                                SkipToken();
+                                return ParseDeclare(accessibility);
                         }
                     }
                     return ParseVariableDeclaration();
@@ -172,6 +182,84 @@ namespace BLML.Phase1Foundation.Parser
             ParseMethodBody(propertyNode, "Property");
             ExitLocalScope();
             return propertyNode;
+        }
+
+        private VB6SyntaxNode ParseEnum(string? accessibility = null)
+        {
+            SkipToken(); // Skip 'Enum'
+            var name = GetToken()?.Value ?? "UnknownEnum";
+            var enumNode = new VB6SyntaxNode { Type = NodeType.Enum, Value = name };
+            if (!string.IsNullOrWhiteSpace(accessibility))
+            {
+                enumNode.Attributes["Accessibility"] = accessibility;
+            }
+
+            while (PeekToken() != null)
+            {
+                if (PeekToken().Value.Equals("End", StringComparison.OrdinalIgnoreCase))
+                {
+                    var next = tokens.ElementAtOrDefault(currentTokenIndex + 1);
+                    if (next != null && next.Value.Equals("Enum", StringComparison.OrdinalIgnoreCase))
+                    {
+                        SkipToken(); // Skip 'End'
+                        SkipToken(); // Skip 'Enum'
+                        break;
+                    }
+                }
+
+                var memberToken = PeekToken();
+                if (memberToken == null) break;
+                if (memberToken.Type != BLML.Phase1Foundation.Lexer.TokenType.Identifier &&
+                    memberToken.Type != BLML.Phase1Foundation.Lexer.TokenType.Keyword)
+                {
+                    SkipToken(); // Defensive: skip a stray token rather than looping forever
+                    continue;
+                }
+
+                var memberName = GetToken()!.Value;
+                var memberNode = new VB6SyntaxNode { Type = NodeType.EnumMember, Value = memberName };
+                if (Match("="))
+                {
+                    var valueExpr = ParseExpression();
+                    if (valueExpr != null) memberNode.Children.Add(valueExpr);
+                }
+                enumNode.Children.Add(memberNode);
+            }
+
+            return enumNode;
+        }
+
+        private VB6SyntaxNode ParseDeclare(string? accessibility = null)
+        {
+            SkipToken(); // Skip 'Declare'
+            var isFunction = PeekToken()?.Value.Equals("Function", StringComparison.OrdinalIgnoreCase) == true;
+            SkipToken(); // Skip 'Function' or 'Sub'
+
+            var name = GetToken()?.Value ?? "UnknownDeclare";
+            var declareNode = new VB6SyntaxNode { Type = NodeType.Declare, Value = name };
+            declareNode.Attributes["IsFunction"] = isFunction.ToString();
+            if (!string.IsNullOrWhiteSpace(accessibility))
+            {
+                declareNode.Attributes["Accessibility"] = accessibility;
+            }
+
+            if (Match("Lib"))
+            {
+                declareNode.Attributes["Lib"] = GetToken()?.Value ?? string.Empty;
+            }
+            if (Match("Alias"))
+            {
+                declareNode.Attributes["Alias"] = GetToken()?.Value ?? string.Empty;
+            }
+
+            ParseParameters(declareNode);
+
+            if (Match("As"))
+            {
+                declareNode.Attributes["ReturnType"] = GetToken()?.Value ?? "Variant";
+            }
+
+            return declareNode;
         }
 
         private VB6SyntaxNode ParseClass()
@@ -381,6 +469,11 @@ namespace BLML.Phase1Foundation.Parser
                     variableNode.Attributes["Optional"] = "true";
                 }
 
+                if (Match("ParamArray"))
+                {
+                    variableNode.Attributes["ParamArray"] = "true";
+                }
+
                 if (Match("ByVal"))
                 {
                     variableNode.Attributes["ByVal"] = "true";
@@ -511,6 +604,8 @@ namespace BLML.Phase1Foundation.Parser
                     return ParseDoLoopStatement();
                 case "select":
                     return ParseSelectCaseStatement();
+                case "with":
+                    return ParseWithStatement();
                 case "set":
                 case "let":
                     SkipToken(); // Skip Set/Let
@@ -523,6 +618,30 @@ namespace BLML.Phase1Foundation.Parser
                 case "exit":
                     return ParseExitStatement();
                 default:
+                    // A leading '.' inside a With block refers to the With target implicitly
+                    // (e.g. `.Name = "x"` means `withTarget.Name = "x"`); the target identifier
+                    // and the '=' are two tokens apart here instead of one, so it needs its own
+                    // lookahead rather than falling through to the generic expression parse below
+                    // (which would otherwise consume the '=' as a comparison operator, not an assignment).
+                    if (token.Value == ".")
+                    {
+                        var afterMember = tokens.ElementAtOrDefault(currentTokenIndex + 2);
+                        if (afterMember != null && afterMember.Value == "=")
+                        {
+                            return ParseWithMemberAssignment();
+                        }
+
+                        var withExpr = ParseExpression();
+                        if (withExpr != null)
+                        {
+                            return new VB6SyntaxNode { Type = NodeType.Statement, Value = "Expression", Children = { withExpr } };
+                        }
+                        SkipToken();
+#pragma warning disable CS8603 // Possible null reference return.
+                        return null;
+#pragma warning restore CS8603 // Possible null reference return.
+                    }
+
                     // If it's an identifier followed by an equal sign, it's an assignment
                     if (IsIdentifierLike(token))
                     {
@@ -543,6 +662,52 @@ namespace BLML.Phase1Foundation.Parser
                     return null;
 #pragma warning restore CS8603 // Possible null reference return.
             }
+        }
+
+        private VB6SyntaxNode ParseWithMemberAssignment()
+        {
+            var target = ParsePrimaryExpression(); // consumes '.Member'
+            if (Match("="))
+            {
+                var expr = ParseExpression();
+                var assignNode = new VB6SyntaxNode { Type = NodeType.Statement, Value = "=" };
+                if (target != null) assignNode.Children.Add(target);
+                if (expr != null) assignNode.Children.Add(expr);
+                return assignNode;
+            }
+#pragma warning disable CS8603 // Possible null reference return.
+            return target;
+#pragma warning restore CS8603 // Possible null reference return.
+        }
+
+        private VB6SyntaxNode ParseWithStatement()
+        {
+            SkipToken(); // Skip 'With'
+            var target = ParseExpression();
+
+            var withNode = new VB6SyntaxNode { Type = NodeType.Statement, Value = "With" };
+            if (target != null) withNode.Children.Add(target);
+
+            var bodyNode = new VB6SyntaxNode { Type = NodeType.Statement, Value = "WithBody" };
+            while (PeekToken() != null)
+            {
+                if (PeekToken().Value.Equals("End", StringComparison.OrdinalIgnoreCase))
+                {
+                    var next = tokens.ElementAtOrDefault(currentTokenIndex + 1);
+                    if (next != null && next.Value.Equals("With", StringComparison.OrdinalIgnoreCase))
+                    {
+                        SkipToken(); // Skip 'End'
+                        SkipToken(); // Skip 'With'
+                        break;
+                    }
+                }
+
+                var stmt = ParseStatement();
+                if (stmt != null) bodyNode.Children.Add(stmt);
+            }
+            withNode.Children.Add(bodyNode);
+
+            return withNode;
         }
 
         private VB6SyntaxNode ParseReDimStatement()
@@ -909,6 +1074,38 @@ namespace BLML.Phase1Foundation.Parser
             return left;
         }
 
+        /// <summary>
+        /// Parses one call argument, recognizing VB6 named-argument syntax
+        /// (`name:=value`, e.g. `MsgBox Prompt:="Hi"`) ahead of a plain positional
+        /// expression. The lexer tokenizes `:=` as a single operator, so a match there
+        /// unambiguously identifies this as a named argument rather than, say, a
+        /// boolean expression named `name` followed by an unrelated `:` statement
+        /// separator.
+        /// </summary>
+        private VB6SyntaxNode ParseCallArgument()
+        {
+            var token = PeekToken();
+            var next = PeekToken(1);
+            if (token != null && next != null && next.Value == ":=" &&
+                (token.Type == BLML.Phase1Foundation.Lexer.TokenType.Identifier || token.Type == BLML.Phase1Foundation.Lexer.TokenType.Keyword))
+            {
+                var argName = GetToken()!.Value;
+                SkipToken(); // Skip ':='
+                var valueExpr = ParseExpression();
+
+                var namedArgNode = new VB6SyntaxNode
+                {
+                    Type = NodeType.Expression,
+                    Value = argName,
+                    Attributes = new Dictionary<string, string> { ["ExpressionKind"] = "NamedArgument" }
+                };
+                if (valueExpr != null) namedArgNode.Children.Add(valueExpr);
+                return namedArgNode;
+            }
+
+            return ParseExpression();
+        }
+
         private VB6SyntaxNode ParsePrimaryExpression()
         {
             var token = PeekToken();
@@ -917,6 +1114,40 @@ namespace BLML.Phase1Foundation.Parser
 #pragma warning disable CS8603 // Possible null reference return.
                 return null;
 #pragma warning restore CS8603 // Possible null reference return.
+            }
+
+            // A leading '.' is an implicit member reference to the enclosing With block's
+            // target (e.g. `.Name` inside `With obj ... End With`) - resolved to
+            // `<withTarget>.Name` at code-generation time, since the AST alone doesn't
+            // carry which With block a given expression is nested in.
+            if (token.Value == ".")
+            {
+                SkipToken(); // Consume '.'
+                var memberName = GetToken()?.Value ?? "UnknownMember";
+                var memberNode = new VB6SyntaxNode
+                {
+                    Type = NodeType.Expression,
+                    Value = memberName,
+                    Attributes = new Dictionary<string, string> { ["ExpressionKind"] = "WithMemberAccess" }
+                };
+
+                if (Match("("))
+                {
+                    memberNode.Attributes["ExpressionKind"] = "WithMemberInvocation";
+                    while (PeekToken() != null && !Match(")"))
+                    {
+                        int prevIdx = currentTokenIndex;
+                        var argument = ParseCallArgument();
+                        if (argument != null) memberNode.Children.Add(argument);
+
+                        if (!Match(",") && currentTokenIndex == prevIdx)
+                        {
+                            SkipToken(); // Safety: skip unrecognized token to prevent infinite loop
+                        }
+                    }
+                }
+
+                return memberNode;
             }
 
             // Handle unary operators: -, Not
@@ -1000,7 +1231,7 @@ namespace BLML.Phase1Foundation.Parser
                     while (PeekToken() != null && !Match(")"))
                     {
                         int prevIdx = currentTokenIndex;
-                        var argument = ParseExpression();
+                        var argument = ParseCallArgument();
                         if (argument != null)
                         {
                             expressionNode.Children.Add(argument);

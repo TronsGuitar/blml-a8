@@ -45,6 +45,10 @@ namespace BLML.Phase1Foundation.AST
                     return BuildVariable(node);
                 case NodeType.Property:
                     return BuildProperty(node);
+                case NodeType.Enum:
+                    return BuildEnum(node);
+                case NodeType.Declare:
+                    return BuildDeclare(node);
                 default:
 #pragma warning disable CS8603 // Possible null reference return.
                     return null;
@@ -97,8 +101,50 @@ namespace BLML.Phase1Foundation.AST
                 IsByRef = !node.Attributes.GetValueOrDefault("ByVal", "false").Equals("true", StringComparison.OrdinalIgnoreCase),
                 IsOptional = node.Attributes.GetValueOrDefault("Optional", "false").Equals("true", StringComparison.OrdinalIgnoreCase),
                 DefaultValue = node.Attributes.GetValueOrDefault("DefaultValue", ""),
-                DefaultValueExpression = defaultValueExpression
+                DefaultValueExpression = defaultValueExpression,
+                IsParamArray = node.Attributes.GetValueOrDefault("ParamArray", "false").Equals("true", StringComparison.OrdinalIgnoreCase)
             };
+        }
+
+        private EnumDeclarationNode BuildEnum(VB6SyntaxNode node)
+        {
+            var enumDecl = new EnumDeclarationNode
+            {
+                Name = node.Value,
+                Accessibility = DetermineAccessibility(node)
+            };
+
+            foreach (var child in node.Children.Where(c => c.Type == NodeType.EnumMember))
+            {
+                var member = new EnumMemberNode { Name = child.Value };
+                if (child.Children.Count > 0)
+                {
+                    member.Value = BuildExpression(child.Children[0]);
+                }
+                enumDecl.Members.Add(member);
+            }
+
+            return enumDecl;
+        }
+
+        private DeclareStatementNode BuildDeclare(VB6SyntaxNode node)
+        {
+            var declare = new DeclareStatementNode
+            {
+                Name = node.Value,
+                IsFunction = node.Attributes.GetValueOrDefault("IsFunction", "false").Equals("true", StringComparison.OrdinalIgnoreCase),
+                Accessibility = DetermineAccessibility(node),
+                LibraryName = node.Attributes.GetValueOrDefault("Lib", ""),
+                Alias = node.Attributes.TryGetValue("Alias", out var alias) ? alias : null,
+                ReturnType = node.Attributes.GetValueOrDefault("ReturnType", node.Attributes.GetValueOrDefault("IsFunction", "false").Equals("true", StringComparison.OrdinalIgnoreCase) ? "Variant" : "void")
+            };
+
+            foreach (var child in node.Children.Where(c => c.Type == NodeType.Variable && c.Attributes.ContainsKey("IsParameter")))
+            {
+                declare.Parameters.Add(BuildParameter(child));
+            }
+
+            return declare;
         }
 
         private PropertyDeclarationNode BuildProperty(VB6SyntaxNode node)
@@ -264,6 +310,10 @@ namespace BLML.Phase1Foundation.AST
                             ExitKind = node.Attributes.GetValueOrDefault("ExitKind", string.Empty)
                         };
                     }
+                    if (node.Value == "With")
+                    {
+                        return BuildWithStatement(node);
+                    }
 #pragma warning disable CS8603 // Possible null reference return.
                     return null;
 #pragma warning restore CS8603 // Possible null reference return.
@@ -297,6 +347,28 @@ namespace BLML.Phase1Foundation.AST
                 if (SymbolTableBuilder.PredefinedConstants.TryGetValue(node.Value, out var constantValue))
                 {
                     return new LiteralExpressionNode { Value = constantValue! };
+                }
+
+                if (node.Attributes.GetValueOrDefault("ExpressionKind") == "WithMemberAccess")
+                {
+                    return new WithMemberAccessExpressionNode { MemberName = node.Value };
+                }
+
+                if (node.Attributes.GetValueOrDefault("ExpressionKind") == "WithMemberInvocation")
+                {
+                    var withInvoke = new InvocationExpressionNode { Target = new WithMemberAccessExpressionNode { MemberName = node.Value } };
+                    foreach (var arg in node.Children)
+                    {
+                        var buildExpr = BuildExpression(arg);
+                        if (buildExpr != null) withInvoke.Arguments.Add(buildExpr);
+                    }
+                    return withInvoke;
+                }
+
+                if (node.Attributes.GetValueOrDefault("ExpressionKind") == "NamedArgument")
+                {
+                    var namedValue = node.Children.Count > 0 ? BuildExpression(node.Children[0]) : new IdentifierExpressionNode { Name = "_missingArgumentValue" };
+                    return new NamedArgumentExpressionNode { Name = node.Value, Value = namedValue! };
                 }
 
                 if (node.Attributes.GetValueOrDefault("ExpressionKind") == "Invocation")
@@ -402,6 +474,28 @@ namespace BLML.Phase1Foundation.AST
             }
 
             return whileStmt;
+        }
+
+        private WithStatementNode BuildWithStatement(VB6SyntaxNode node)
+        {
+            var withStmt = new WithStatementNode
+            {
+                Target = node.Children.Count > 0 && node.Children[0].Value != "WithBody"
+                    ? BuildExpression(node.Children[0]) ?? new IdentifierExpressionNode { Name = "_withTargetMissing" }
+                    : new IdentifierExpressionNode { Name = "_withTargetMissing" }
+            };
+
+            var bodyNode = node.Children.FirstOrDefault(c => c.Value == "WithBody");
+            if (bodyNode != null)
+            {
+                foreach (var stmt in bodyNode.Children)
+                {
+                    var buildStmt = BuildStatement(stmt);
+                    if (buildStmt != null) withStmt.Body.Statements.Add(buildStmt);
+                }
+            }
+
+            return withStmt;
         }
 
         private DoLoopStatementNode BuildDoLoopStatement(VB6SyntaxNode node)

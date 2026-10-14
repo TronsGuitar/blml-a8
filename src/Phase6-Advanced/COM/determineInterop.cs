@@ -4,6 +4,9 @@ using System.Runtime.InteropServices;
 using System.Collections.Generic;
 using System.Diagnostics;
 
+namespace BLML.Phase6Advanced.COM
+{
+
 public class ReferencedLibrary
 {
     public List<string> Types { get; private set; } = new List<string>();
@@ -272,4 +275,6 @@ public class LibraryInspector
             Debug.WriteLine($"General error while inspecting assembly: {ex.Message}");
         }
     }
+}
+
 }

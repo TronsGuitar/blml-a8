@@ -53,7 +53,12 @@ namespace BLML.Phase1Foundation.Parser
                 "y" => $"{args[2]}.AddYears({args[1]})",
                 _ => $"// TODO: Unsupported DateAdd interval: {args[0]}"
             }},
-            { "Weekday", args => $"(int)({args[0]}).DayOfWeek + 1" }
+            { "Weekday", args => $"(int)({args[0]}).DayOfWeek + 1" },
+            // Late-bound COM creation - the safe default conversion target for any
+            // registered ProgID without first running tlbimp (see
+            // Phase6-Advanced/COM/TypeLibConverter.cs for the tlbimp-based early-bound
+            // path, used when an interop assembly has already been generated).
+            { "CreateObject", args => $"System.Activator.CreateInstance(System.Type.GetTypeFromProgID({args[0]}))" }
         };
 
         public static bool IsBuiltInFunction(string name)

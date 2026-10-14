@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-namespace BLML.Phase6AdvancedFeatures;
+namespace BLML.Phase6Advanced;
 
 public static class PropertyProcedureGenerator
 {
