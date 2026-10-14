@@ -64,3 +64,28 @@ The existing prototype assets currently provide:
 - replace the current prototype scripts and placeholder templates with a real migration pipeline
 - add ASP/VBScript parsing, backend generation, and metadata-driven UI generation
 - move from documentation-only coverage to executable generation and validation of produced web artifacts
+
+## Platform decision: Angular (real pipeline added)
+
+The "make the platform decision" TODO above is resolved: **Angular**, per `ProjectPlan.md`. The
+`RazorPages/` prototype above is left in place as a historical artifact - nothing in it is part
+of the build, and it isn't superseded so much as simply not the direction taken.
+
+A real, tested ASP-to-Angular pipeline now exists alongside it:
+
+- `AspParser/` - a classic ASP/VBScript lexer and recursive-descent parser (`AspLexer`,
+  `VbScriptTokenizer`, `VBScriptParser`, `AspParser`, `IncludeFileResolver`, `GlobalAsaParser`)
+- `Analysis/` - `BusinessLogicExtractor`, `SessionVariableTracker`, `DatabaseCallAnalyzer`,
+  `PageFlowAnalyzer`
+- `Backend/` - `DtoGenerator`, `ServiceGenerator`, `ControllerGenerator`, `AuthConverter`,
+  `MiddlewareGenerator` (.NET 8 Web API)
+- `Frontend/` - `TemplateConverter`, `ComponentGenerator`, `FormConverter`, `RoutingGenerator`,
+  `AngularAntiPatternChecker` (standalone Angular 17+: `@if`/`@for`, `inject()`, signals, typed
+  Reactive Forms - see class-level docs on each type for the specific conventions and why)
+- `Database/` - `EFCoreGenerator`, `MigrationScripts`, `RepositoryGenerator` (delegate to the
+  already-implemented Phase 4 EF Core/schema generators rather than duplicating them)
+- `AspProjectConverter` ties all of the above into one pipeline, exposed via the CLI as
+  `convert-asp-project --input <folder-of-.asp-files> --output <folder>`
+
+See `tests/BLML.Tests/Phase5AspToAngularTests.cs` for coverage of each piece, including an
+end-to-end test that runs a small multi-page ASP app through the full pipeline.

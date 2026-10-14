@@ -189,6 +189,44 @@ public class Phase8CliTests
         }
     }
 
+    [Fact]
+    public async Task CommandLineInterface_ShouldConvertAspProject()
+    {
+        var cli = new CommandLineInterface();
+        var root = CreateTempFolder();
+
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(root, "index.asp"), "<html><body>Home</body></html>");
+            var outputPath = Path.Combine(root, "out");
+
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var exitCode = await cli.RunAsync(["convert-asp-project", "--input", root, "--output", outputPath], output, error);
+
+            Assert.Equal((int)CliExitCode.Success, exitCode);
+            Assert.True(File.Exists(Path.Combine(outputPath, "ClientApp", "src", "app", "index", "index.component.ts")));
+            Assert.Contains("[progress]", output.ToString());
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public async Task CommandLineInterface_ShouldReturnInputNotFoundForMissingAspDirectory()
+    {
+        var cli = new CommandLineInterface();
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        var exitCode = await cli.RunAsync(["convert-asp-project", "--input", "missing-dir"], output, error);
+
+        Assert.Equal((int)CliExitCode.InputNotFound, exitCode);
+        Assert.Contains("input directory", error.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string CreateTempFolder()
     {
         var path = Path.Combine(Path.GetTempPath(), "BLML.Tests", Guid.NewGuid().ToString("N"));

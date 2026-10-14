@@ -37,11 +37,17 @@
     <Compile Include="Phase7-Optimization\Documentation\XmlDocGenerator.cs" />
     <Compile Include="Phase7-Optimization\Refactoring\LinqOptimizer.cs" />
     <Compile Include="Phase5-ASPtoAngular\Analysis\DatabaseCallAnalyzer.cs" />
+    <Compile Include="Phase5-ASPtoAngular\Analysis\BusinessLogicExtractor.cs" />
     <Compile Include="Phase5-ASPtoAngular\Analysis\PageFlowAnalyzer.cs" />
     <Compile Include="Phase5-ASPtoAngular\Analysis\SessionVariableTracker.cs" />
+    <Compile Include="Phase5-ASPtoAngular\AspParser\AspAstNodes.cs" />
     <Compile Include="Phase5-ASPtoAngular\AspParser\AspLexer.cs" />
     <Compile Include="Phase5-ASPtoAngular\AspParser\AspParser.cs" />
+    <Compile Include="Phase5-ASPtoAngular\AspParser\GlobalAsaParser.cs" />
+    <Compile Include="Phase5-ASPtoAngular\AspParser\IncludeFileResolver.cs" />
     <Compile Include="Phase5-ASPtoAngular\AspParser\VBScriptParser.cs" />
+    <Compile Include="Phase5-ASPtoAngular\AspParser\VbScriptTokenizer.cs" />
+    <Compile Include="Phase5-ASPtoAngular\AspProjectConverter.cs" />
     <Compile Include="Phase5-ASPtoAngular\Backend\ApiGenerator\ControllerGenerator.cs" />
     <Compile Include="Phase5-ASPtoAngular\Backend\ApiGenerator\DtoGenerator.cs" />
     <Compile Include="Phase5-ASPtoAngular\Backend\ApiGenerator\ServiceGenerator.cs" />
@@ -51,6 +57,8 @@
     <Compile Include="Phase5-ASPtoAngular\Database\MigrationScripts.cs" />
     <Compile Include="Phase5-ASPtoAngular\Database\RepositoryGenerator.cs" />
     <Compile Include="Phase5-ASPtoAngular\Frontend\ComponentGenerator.cs" />
+    <Compile Include="Phase5-ASPtoAngular\Frontend\AngularAntiPatternChecker.cs" />
+    <Compile Include="Phase5-ASPtoAngular\Frontend\AspExpressionToTypeScript.cs" />
     <Compile Include="Phase5-ASPtoAngular\Frontend\FormConverter.cs" />
     <Compile Include="Phase5-ASPtoAngular\Frontend\RoutingGenerator.cs" />
     <Compile Include="Phase5-ASPtoAngular\Frontend\TemplateConverter.cs" />
